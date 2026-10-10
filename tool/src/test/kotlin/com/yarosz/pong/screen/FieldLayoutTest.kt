@@ -1,9 +1,9 @@
 package com.yarosz.pong.screen
 
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FieldLayoutTest {
@@ -43,17 +43,8 @@ class FieldLayoutTest {
     }
 
     @Test
-    fun `frame intervals are logged in batches of 60 tenths of a millisecond`() {
-        val log = FrameLog()
-        repeat(59) { assertNull(log.record(16_666_667)) }
-        val line = log.record(16_640_000)!!
-        val values = line.split(' ')
-        assertEquals(60, values.size)
-        assertEquals("frame_ms=16.7", values.first())
-        assertEquals("frame_ms=16.6", values.last())
-        log.record(33_000_000)
-        log.reset()
-        repeat(59) { assertNull(log.record(8_000_000)) }
-        assertEquals("frame_ms=8.0", log.record(8_000_000)!!.split(' ').first())
+    fun `the pause target in canvas px follows the letterbox`() {
+        assertContentEquals(floatArrayOf(468f, 52f, 612f, 196f), Letterbox(1080f, 1240f).pauseTarget())
+        assertContentEquals(floatArrayOf(1036f, 32f, 1324f, 320f), Letterbox(2160f + 200f, 2336f).pauseTarget())
     }
 }

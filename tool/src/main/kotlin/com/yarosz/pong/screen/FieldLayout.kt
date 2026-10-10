@@ -27,8 +27,8 @@ object FieldLayout {
 
     const val HALO = 40f
 
-    private const val PAUSE_TARGET_Y = 88.0
-    private const val PAUSE_TARGET_HALF = 72.0
+    const val PAUSE_TARGET_Y = 88f
+    const val PAUSE_TARGET_HALF = 72f
 
     fun inPauseTarget(x: Double, y: Double) = abs(x - CENTRE_X) <= PAUSE_TARGET_HALF && abs(y - PAUSE_TARGET_Y) <= PAUSE_TARGET_HALF
 

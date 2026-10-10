@@ -178,3 +178,15 @@ resulting spec.
   Point pause and the Hold share one 0.6 s constant, `PAUSE_STEPS` (C2).
 - D26 `tan` and `exp` come from `StrictMath`, so the same code gives the same Match on any JVM or ART.
   A golden test pins one recorded Match's final state.
+
+## Build decisions (S2b, UI review fixes; 2026-10-10)
+
+- D27 The panel's preselection. Entering Paused selects Resume and entering Match over selects Play
+  again. Paused shown again (a re-attach, `onScreenHide` or `onAppPause` while already Paused) selects
+  Resume again, because Menu ends the Match and a player returning to the Tool should never lose it to
+  one press. Match over shown again keeps its row: the Match has already ended, so neither row loses
+  anything, and the player's last choice stands, as Title's does.
+- D28 Audio failure never stops the game. If any of the three tracks fails to build, the ones built are
+  released and the Tool plays silent; a failed play or stop is logged and skipped.
+- D29 The panel hint keeps its copy and wraps with balanced lines (`LineBreak.Heading`) when it does
+  not fit on one line, so no word is left alone on the second line.

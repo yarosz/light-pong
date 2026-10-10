@@ -11,7 +11,10 @@ data class Settings(val difficulty: Difficulty = Difficulty.DEFAULT, val soundOn
     fun encode() = "difficulty=${difficulty.name.lowercase()}\nsound=${if (soundOn) "on" else "off"}\n"
 
     companion object {
-        /** Null for text that is not exactly what [encode] writes. */
+        /**
+         * Reads the `difficulty` and `sound` lines [encode] writes, in any order, ignoring blank and
+         * unknown lines. Null when either is missing or holds a value [encode] never writes.
+         */
         fun decode(text: String): Settings? {
             val fields = text.lines().filter { it.isNotBlank() }.associate { it.substringBefore('=') to it.substringAfter('=', "") }
             val difficulty = Difficulty.entries.firstOrNull { it.name.lowercase() == fields["difficulty"] } ?: return null

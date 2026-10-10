@@ -8,7 +8,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -24,8 +26,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.thelightphone.sdk.InitialScreen
@@ -34,13 +44,15 @@ import com.thelightphone.sdk.LightViewModel
 import com.thelightphone.sdk.SealedLightActivity
 import com.thelightphone.sdk.SimpleLightScreen
 import com.yarosz.pong.core.Phase
+import com.yarosz.pong.screen.FieldLayout
 import com.yarosz.pong.screen.FrameLog
-import com.yarosz.pong.screen.KeyAction
+import com.yarosz.pong.screen.KeyPress
 import com.yarosz.pong.screen.Letterbox
 import com.yarosz.pong.screen.Mode
 import com.yarosz.pong.screen.PongOwner
 import com.yarosz.pong.screen.PongState
 import com.yarosz.pong.screen.SettingsFile
+import kotlin.math.roundToInt
 
 /**
  * The view onto [PongOwner]'s state. Every input runs through [update], which saves the settings when
@@ -74,10 +86,7 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
     }
 
     fun frame(intervalNanos: Long) {
-        update {
-            val sound = advance(intervalNanos)
-            if (sound != null && settings.soundOn) tones?.play(sound)
-        }
+        update { advance(intervalNanos)?.let { tones?.play(it) } }
         if (shell.mode == Mode.PLAY && match?.phase == Phase.Rally) {
             frameLog.record(intervalNanos)?.let { Log.d(PERF_TAG, it) }
         } else {
@@ -85,21 +94,23 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
         }
     }
 
-    private fun key(keyCode: Int, action: KeyAction, repeatCount: Int): Boolean {
+    private fun key(press: KeyPress): Boolean {
         var consumed = false
-        update { consumed = key(keyCode, action, repeatCount) }
+        update { consumed = key(press) }
         return consumed
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent) = key(keyCode, KeyAction.DOWN, event.repeatCount)
+    override fun onKeyDown(keyCode: Int, event: KeyEvent) = key(KeyPress.down(keyCode, event.repeatCount))
 
-    override fun onKeyUp(keyCode: Int, event: KeyEvent) = key(keyCode, KeyAction.UP, event.repeatCount)
+    override fun onKeyUp(keyCode: Int, event: KeyEvent) = key(KeyPress.up(keyCode, event.repeatCount))
 
-    override fun onKeyMultiple(keyCode: Int, repeatCount: Int, event: KeyEvent) = key(keyCode, KeyAction.MULTIPLE, repeatCount)
+    override fun onKeyMultiple(keyCode: Int, repeatCount: Int, event: KeyEvent) = key(KeyPress.multiple(keyCode, repeatCount))
 
     override fun onAppPause() = update { pause() }
 
     override fun onScreenHide(screen: SimpleLightScreen<Unit>) = update { pause() }
+
+    override fun onScreenShow(screen: SimpleLightScreen<Unit>) = update {}
 
     companion object {
         const val TAG = "Pong"
@@ -160,17 +171,46 @@ class PongScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, PongVi
             vm.frame.intValue
             vm.match?.let { drawField(it, pauseBars = play) }
         }
+        if (play) PauseControl { vm.update { tapField(FieldLayout.CENTRE_X.toDouble(), FieldLayout.PAUSE_TARGET_Y.toDouble()) } }
     }
 }
 
-/** DESIGN.md item 24: a drag moves the Paddle target 1:1; a touch that stays under slop is a tap. */
+/**
+ * DESIGN.md items 6 and 30: the pause bars' accessibility node, a transparent button over the letterboxed
+ * 144x144 target. It takes no pointer input, so a touch there still reaches the field's gestures.
+ */
+@Composable
+private fun PauseControl(onPause: () -> Unit) = BoxWithConstraints(Modifier.fillMaxSize()) {
+    val target = Letterbox(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()).pauseTarget()
+    val side = with(LocalDensity.current) { (target[2] - target[0]).toDp() }
+    Box(
+        Modifier
+            .offset { IntOffset(target[0].roundToInt(), target[1].roundToInt()) }
+            .size(side)
+            .semantics {
+                contentDescription = "Pause"
+                role = Role.Button
+                onClick {
+                    onPause()
+                    true
+                }
+            },
+    )
+}
+
+/**
+ * DESIGN.md item 24: a drag moves the Paddle target 1:1; a touch that stays under slop and ends in a
+ * pointer up is a tap. A gesture that loses its pointer or is cancelled does nothing more.
+ */
 private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.fieldGestures(vm: PongViewModel) = awaitEachGesture {
     val down = awaitFirstDown()
     val box = Letterbox(size.width.toFloat(), size.height.toFloat())
     var travel = Offset.Zero
     var dragging = false
     while (true) {
-        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+        // Compose delivers a cancel as an up that is already consumed.
+        if (!change.pressed && change.isConsumed) return@awaitEachGesture
         val delta = change.positionChange()
         travel += delta
         if (!dragging && travel.getDistance() > viewConfiguration.touchSlop) {
@@ -179,8 +219,9 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.fieldGes
         } else if (dragging && delta.y != 0f) {
             vm.update { drag(delta.y / box.scale.toDouble()) }
         }
+        val up = change.changedToUp()
         change.consume()
-        if (!change.pressed) break
+        if (up) break
     }
     if (!dragging) vm.update { tapField(box.fieldX(down.position.x), box.fieldY(down.position.y)) }
 }

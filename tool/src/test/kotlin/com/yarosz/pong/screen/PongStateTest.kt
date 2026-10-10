@@ -2,6 +2,7 @@ package com.yarosz.pong.screen
 
 import com.yarosz.pong.core.Difficulty
 import com.yarosz.pong.core.Match
+import com.yarosz.pong.core.Paddle
 import com.yarosz.pong.core.Phase
 import com.yarosz.pong.core.Side
 import kotlin.test.Test
@@ -9,7 +10,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PongStateTest {
@@ -191,16 +191,69 @@ class PongStateTest {
     }
 
     @Test
-    fun `re-attaching shows any in-match state as Paused`() {
-        val first = PongOwner.attach { Settings() }
-        first.tapTitle(TitleRow.NORMAL)
-        first.command(Command.CLICK)
-        assertEquals(Mode.PLAY, first.mode)
-        val again = PongOwner.attach { error("settings are loaded once per process") }
-        assertSame(first, again)
-        assertEquals(Mode.PAUSED, again.mode)
-        again.tapMenu(MenuRow.MENU)
-        assertEquals(Mode.TITLE, PongOwner.attach { Settings() }.mode)
+    fun `leaving the screen while Paused selects Resume again`() {
+        val state = stateIn(Mode.PAUSED)
+        state.command(Command.DOWN)
+        state.pause()
+        assertEquals(Mode.PAUSED, state.mode)
+        assertEquals(MenuRow.FIRST, state.menuRow)
+    }
+
+    @Test
+    fun `the panel keeps its selection between inputs`() {
+        val state = stateIn(Mode.PAUSED)
+        state.command(Command.DOWN)
+        state.advance(FRAME_NANOS)
+        state.tapField(540.0, 88.0)
+        assertEquals(MenuRow.MENU, state.menuRow)
+    }
+
+    @Test
+    fun `awake is the match's keep-screen-on`() {
+        assertFalse(newState().shell.awake)
+        val state = stateIn(Mode.PLAY)
+        assertTrue(state.shell.awake)
+        state.command(Command.CLICK)
+        state.advance(FRAME_NANOS)
+        assertTrue(state.shell.awake)
+        state.pause()
+        assertFalse(state.shell.awake)
+        assertFalse(stateIn(Mode.OVER).shell.awake)
+    }
+
+    @Test
+    fun `a frame plays only the last of its sounds`() {
+        val state = stateIn(Mode.PLAY)
+        val twin = Match(42, Difficulty.NORMAL)
+        state.command(Command.CLICK)
+        twin.click()
+        var several = 0
+        var frames = 0
+        while (state.mode == Mode.PLAY && several < 3 && frames++ < 100_000) {
+            val follow = twin.ball.cy - twin.playerTarget - Paddle.HALF_LENGTH
+            state.drag(follow)
+            twin.drag(follow)
+            val sounds = twin.advance(Match.MAX_FRAME_NANOS)
+            assertEquals(sounds.lastOrNull(), state.advance(Match.MAX_FRAME_NANOS))
+            if (sounds.size > 1) several++
+            if (twin.phase is Phase.PlayerServe) {
+                state.command(Command.CLICK)
+                twin.click()
+            }
+        }
+        assertEquals(3, several)
+    }
+
+    @Test
+    fun `a frame plays no sound with sound off`() {
+        val state = newState(Settings(soundOn = false))
+        state.command(Command.CLICK)
+        state.command(Command.CLICK)
+        repeat(60 * 30) {
+            assertNull(state.advance(FRAME_NANOS))
+            if (state.match?.phase is Phase.PlayerServe) state.command(Command.CLICK)
+        }
+        assertTrue(state.match!!.playerScore + state.match!!.computerScore > 0)
     }
 
     @Test

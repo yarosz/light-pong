@@ -33,14 +33,13 @@ data class Shell(
     val difficulty: Difficulty?,
     val winner: Side?,
     val servePrompt: Boolean,
-) {
-    val awake get() = mode == Mode.PLAY
-}
+    val awake: Boolean,
+)
 
 /**
  * The Tool's whole screen state: the Title selection, the Match in progress and the panel selection.
- * Every input goes through here, so this is where a mode change resets the panel selection (Resume and
- * Play again are preselected every time) and where the PongEvent log lines come from.
+ * Every input goes through here, so this is where the panel's preselection rule runs
+ * ([preselectMenuRow]) and where the PongEvent log lines come from.
  */
 class PongState(settings: Settings, private val newSeed: () -> Long) {
 
@@ -74,14 +73,15 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
             difficulty = match?.difficulty,
             winner = (match?.phase as? Phase.MatchOver)?.winner,
             servePrompt = match?.servePromptShown == true,
+            awake = match?.keepScreenOn == true,
         )
 
     /** The PongEvent lines since the last call. */
     fun drainLog(): List<String> = log.toList().also { log.clear() }
 
     /** One key from any of the three hooks: returns whether it is consumed. */
-    fun key(keyCode: Int, action: KeyAction, repeatCount: Int): Boolean {
-        val decision = decideKey(keyCode, action, repeatCount)
+    fun key(press: KeyPress): Boolean {
+        val decision = decideKey(press)
         decision.command?.let(::command)
         return decision.consumed
     }
@@ -131,15 +131,18 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
         if (mode == Mode.PLAY) match?.drag(dy)
     }
 
-    /** Runs the Match for one frame; returns the sound to play, the last of the frame's (decision log D19). */
+    /** Runs the Match for one frame; returns the tone to play: the frame's last sound (decision log D19), none with sound off. */
     fun advance(frameNanos: Long): SoundEvent? {
         var sounds = emptyList<SoundEvent>()
         trackedFrame { match?.advance(frameNanos).orEmpty().also { sounds = it } }
-        return sounds.lastOrNull()
+        return sounds.lastOrNull()?.takeIf { settings.soundOn }
     }
 
-    /** onAppPause, onScreenHide, or a new view model re-attaching: any in-match Phase shows Paused. */
-    fun pause() = tracked { match?.pause() }
+    /**
+     * onAppPause, onScreenHide, or a new view model re-attaching: any in-match Phase shows Paused. The
+     * screen is being left or shown again, so Paused shows Resume selected ([preselectMenuRow]).
+     */
+    fun pause() = tracked(reshown = true) { match?.pause() }
 
     private fun activate(row: TitleRow) {
         val difficulty = row.difficulty
@@ -176,12 +179,12 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
         return Snapshot(current, mode, current?.phase?.let(::phaseName), current?.playerScore ?: 0, current?.computerScore ?: 0)
     }
 
-    private inline fun tracked(block: () -> Unit) = trackedFrame {
+    private inline fun tracked(reshown: Boolean = false, block: () -> Unit) = trackedFrame(reshown) {
         block()
         emptyList()
     }
 
-    private inline fun trackedFrame(block: () -> List<SoundEvent>) {
+    private inline fun trackedFrame(reshown: Boolean = false, block: () -> List<SoundEvent>) {
         val before = snapshot()
         val sounds = block()
         val after = snapshot()
@@ -198,11 +201,21 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
             }
             if (scorer != null) log += "point=${scorer.name.lowercase()} score=${after.playerScore}-${after.computerScore}"
         }
+        preselectMenuRow(before.mode, after.mode, reshown)
         logMode(before, after)
     }
 
+    /**
+     * DESIGN.md items 27-28, decision log D27. Entering Paused or Match over selects the first row
+     * (Resume, Play again). Paused shown again after the screen was left selects Resume too, so one press
+     * on return never ends the Match. Match over shown again keeps its row: neither row loses anything.
+     */
+    private fun preselectMenuRow(before: Mode, after: Mode, reshown: Boolean) {
+        val entered = after != before
+        if ((after == Mode.PAUSED && (entered || reshown)) || (after == Mode.OVER && entered)) menuRow = MenuRow.FIRST
+    }
+
     private fun logMode(before: Snapshot, after: Snapshot) {
-        if (after.mode != before.mode && (after.mode == Mode.PAUSED || after.mode == Mode.OVER)) menuRow = MenuRow.FIRST
         val changed = after.mode != before.mode || after.match !== before.match ||
             (after.mode == Mode.PLAY && after.phase != before.phase && after.phase != POINT)
         if (!changed) return

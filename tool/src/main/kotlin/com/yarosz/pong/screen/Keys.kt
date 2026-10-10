@@ -11,6 +11,18 @@ val WHEEL_DOWN = if (WHEEL_UP == KEY_WHEEL_CCW) KEY_WHEEL_CW else KEY_WHEEL_CCW
 /** Which of LightActivity's three key hooks asked. */
 enum class KeyAction { DOWN, UP, MULTIPLE }
 
+/**
+ * A key as one of LightActivity's three hooks reports it. [down], [up] and [multiple] take the hook's
+ * arguments: the event's repeat count for onKeyDown and onKeyUp, onKeyMultiple's own count.
+ */
+data class KeyPress(val keyCode: Int, val action: KeyAction, val repeatCount: Int) {
+    companion object {
+        fun down(keyCode: Int, eventRepeatCount: Int) = KeyPress(keyCode, KeyAction.DOWN, eventRepeatCount)
+        fun up(keyCode: Int, eventRepeatCount: Int) = KeyPress(keyCode, KeyAction.UP, eventRepeatCount)
+        fun multiple(keyCode: Int, repeatCount: Int) = KeyPress(keyCode, KeyAction.MULTIPLE, repeatCount)
+    }
+}
+
 enum class Command { UP, DOWN, CLICK }
 
 /** [consumed] is what the hook returns; [command] is what, if anything, the key does. */
@@ -22,13 +34,13 @@ data class KeyDecision(val consumed: Boolean, val command: Command?)
  * shutter among them, stays with the system. A turn acts on every key-down, repeats included; a click
  * only on its first key-down.
  */
-fun decideKey(keyCode: Int, action: KeyAction, repeatCount: Int): KeyDecision {
-    val command = when (keyCode) {
+fun decideKey(press: KeyPress): KeyDecision {
+    val command = when (press.keyCode) {
         WHEEL_UP -> Command.UP
         WHEEL_DOWN -> Command.DOWN
         KEY_WHEEL_CLICK -> Command.CLICK
         else -> return KeyDecision(consumed = false, command = null)
     }
-    val acts = action == KeyAction.DOWN && (command != Command.CLICK || repeatCount == 0)
+    val acts = press.action == KeyAction.DOWN && (command != Command.CLICK || press.repeatCount == 0)
     return KeyDecision(consumed = true, command = command.takeIf { acts })
 }

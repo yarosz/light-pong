@@ -16,12 +16,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -47,16 +50,18 @@ private fun Difficulty.label() = when (this) {
     Difficulty.HARD -> "Hard"
 }
 
+/** [LineBreak.Heading] balances a wrapped label's lines, so a hint that wraps leaves no orphan word. */
 @Composable
 private fun Label(text: String, size: TextUnit, modifier: Modifier = Modifier) =
-    BasicText(text, modifier, style = TextStyle(color = Color.White, fontSize = size, textAlign = TextAlign.Center))
+    BasicText(text, modifier, style = TextStyle(color = Color.White, fontSize = size, textAlign = TextAlign.Center, lineBreak = LineBreak.Heading))
 
 /** One menu row: the 32 px square marker 24 px left of the label when selected (DESIGN.md item 25). */
 @Composable
 private fun MenuItem(label: String, selected: Boolean, onTap: () -> Unit) {
     val density = LocalDensity.current
+    val currentOnTap by rememberUpdatedState(onTap)
     Row(
-        Modifier.height(ROW_PITCH).pointerInput(label) { detectTapGestures { onTap() } },
+        Modifier.height(ROW_PITCH).pointerInput(Unit) { detectTapGestures { currentOnTap() } },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         with(density) {
