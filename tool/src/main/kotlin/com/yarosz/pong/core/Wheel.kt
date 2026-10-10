@@ -19,8 +19,9 @@ enum class Sensitivity(val factor: Double) {
         val DEFAULT = NORMAL
         const val SLOW_STEP = 40.0
         const val FAST_STEP = 80.0
-        const val SLOW_RATE = 8.0
-        const val FAST_RATE = 25.0
+        /** The slowest rate [DetentRate] reads above 0: two Detents one window apart. */
+        const val SLOW_RATE = 1_000.0 / DetentRate.WINDOW_MILLIS
+        const val FAST_RATE = 40.0
     }
 }
 

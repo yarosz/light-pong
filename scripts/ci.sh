@@ -6,7 +6,7 @@
 #   scripts/ci.sh --dry-run    run the checks, print the evidence, post nothing
 #
 # Contexts:
-#   signoff/emulator  unit tests + Light-builder simulation + emulator round trip on the Pong AVD
+#   signoff/emulator  unit tests + bench-test.sh + Light-builder simulation + emulator round trip on the Pong AVD
 #                     (docs-only diffs: posted green as "not applicable: docs-only")
 #
 # The emulator is the one running AVD $PONG_AVD (default LightPhone3-pong, on emulator-5560), found
@@ -98,6 +98,8 @@ else
   ./gradlew -q --console=plain :tool:testDebugUnitTest || fail_ctx emulator "unit tests"
   tests=$(cat tool/build/test-results/testDebugUnitTest/*.xml | grep -oE '<testsuite [^>]*tests="[0-9]+"' | grep -oE 'tests="[0-9]+"' | grep -oE '[0-9]+' | paste -sd+ - | bc)
   note "unit tests: $tests passed"
+  bench=$(scripts/bench-test.sh 2>&1) || { echo "$bench" >&2; fail_ctx emulator "bench-test.sh"; }
+  note "benchmark script check: ${bench#bench-test: }"
 
   lblog=$(mktemp)
   if ! scripts/light-build.sh >"$lblog" 2>&1; then

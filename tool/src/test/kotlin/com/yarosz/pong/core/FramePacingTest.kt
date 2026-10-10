@@ -25,10 +25,10 @@ class FramePacingTest {
             val match = Match(3, Difficulty.HARD)
             val drawn = mutableListOf<Double>()
             val stepped = mutableListOf<Double>()
-            match.benchmarkRally()
+            match.holdAtCap()
             match.advance(PERIOD_NANOS)
             for (interval in jitteredIntervals(Random(period), FRAMES, period)) {
-                match.benchmarkRally()
+                match.holdAtCap()
                 val drawnBefore = match.drawnBall!!
                 val before = match.ball
                 match.advance(interval)
@@ -46,6 +46,21 @@ class FramePacingTest {
     }
 
     @Test
+    fun `pausing leaves the drawn picture where it was`() {
+        val match = Match(9, Difficulty.NORMAL)
+        match.serve()
+        match.drag(150.0)
+        match.advance(PERIOD_NANOS + 1_300_000)
+        val ball = match.drawnBall
+        val playerTop = match.drawnPlayerTop
+        val computerTop = match.drawnComputerTop
+        match.pause()
+        assertEquals(ball, match.drawnBall)
+        assertEquals(playerTop, match.drawnPlayerTop)
+        assertEquals(computerTop, match.drawnComputerTop)
+    }
+
+    @Test
     fun `the drawn Ball does not sweep back to the centre after a Point`() {
         val match = Match(5, Difficulty.EASY)
         match.serve()
@@ -54,6 +69,14 @@ class FramePacingTest {
         repeat(3) { match.advance(4_000_000) }
         assertEquals(Ball.AT_CENTRE.cx, match.drawnBall!!.cx)
         assertEquals(Ball.AT_CENTRE.cy, match.drawnBall!!.cy)
+    }
+
+    /** Keeps a Rally going at the speed cap: serves if a serve is pending, and puts both Paddles on the Ball's line. */
+    private fun Match.holdAtCap() {
+        if (phase is Phase.PlayerServe) serve()
+        val factor = Ball.MAX_SPEED / abs(ball.vx)
+        val capped = ball.copy(vx = ball.vx * factor, vy = ball.vy * factor)
+        place(capped, Paddle.clampTop(capped.cy - Paddle.HALF_LENGTH))
     }
 
     private fun stepsPerFrame(match: Match, intervals: List<Long>): Map<Int, Int> {

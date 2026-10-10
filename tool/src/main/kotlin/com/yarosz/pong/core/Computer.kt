@@ -7,8 +7,9 @@ import kotlin.random.Random
 /** The computer's paddle and the controller that moves it. */
 class Computer internal constructor(val difficulty: Difficulty, private val rng: Random) {
 
+    /** Set directly only by [Match.place]. */
     var top = Paddle.CENTRE_TOP
-        private set
+        internal set
 
     /** One approach of the ball toward the computer: its reaction countdown and where on the paddle it aims. */
     private class Approach(val aim: Double) {
@@ -31,11 +32,6 @@ class Computer internal constructor(val difficulty: Difficulty, private val rng:
             moveToward(Paddle.CENTRE_TOP, difficulty.maxSpeed / 2)
         }
         current?.let { it.waitedSteps++ }
-    }
-
-    /** The benchmark build's endless Rally only ([Match.benchmarkRally]). */
-    internal fun place(top: Double) {
-        this.top = top
     }
 
     internal fun intercept(ball: Ball): Double =

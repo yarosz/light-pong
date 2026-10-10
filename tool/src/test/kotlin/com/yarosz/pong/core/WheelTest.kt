@@ -4,6 +4,7 @@ import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** DESIGN.md item 20 and decision log D31: the rate-based step and the Sensitivity setting. */
@@ -14,8 +15,8 @@ class WheelTest {
     }
 
     @Test
-    fun `the step curve at 0, 8, 16_5, 25 and 60 Detents a second`() {
-        val rates = listOf(0.0, 8.0, 16.5, 25.0, 60.0)
+    fun `the step curve at 0, 10, 25, 40 and 60 Detents a second`() {
+        val rates = listOf(0.0, 10.0, 25.0, 40.0, 60.0)
         assertEquals(listOf(40.0, 40.0, 60.0, 80.0, 80.0), rates.map { Sensitivity.NORMAL.step(it) })
         assertEquals(listOf(60.0, 60.0, 90.0, 120.0, 120.0), rates.map { Sensitivity.FAST.step(it) })
     }
@@ -51,26 +52,27 @@ class WheelTest {
                 millis += if (rng.nextInt(4) == 0) rng.nextLong(0, 400) else rng.nextLong(0, 60)
                 val down = rng.nextBoolean()
                 val before = match.playerTarget
-                match.turn(down, millis)
+                val step = sensitivity.step(checkNotNull(match.turn(down, millis)))
                 match.step()
                 val moved = abs(match.playerTarget - before)
                 val atEnd = match.playerTarget == 0.0 || match.playerTarget == Paddle.MAX_TOP
                 val range = Sensitivity.SLOW_STEP * sensitivity.factor - EPS..Sensitivity.FAST_STEP * sensitivity.factor + EPS
-                assertTrue(moved in range || (atEnd && moved <= range.endInclusive), "seed $seed $sensitivity moved $moved")
+                assertTrue(step in range, "seed $seed $sensitivity step $step")
+                assertTrue(abs(moved - step) < EPS || (atEnd && moved <= step), "seed $seed $sensitivity moved $moved for a $step px step")
                 assertTrue(match.playerTarget in 0.0..Paddle.MAX_TOP)
             }
         }
     }
 
     @Test
-    fun `a spin of 8 Detents a second or slower moves 40 px a Detent, as 0_1_0 did`() {
+    fun `a spin of 10 Detents a second or slower moves 40 px a Detent, as 0_1_0 did`() {
         for (seed in 1L..50) {
             val rng = Random(seed)
             val match = Match(seed, Difficulty.NORMAL)
             var expected = match.playerTarget
             var millis = 0L
             repeat(300) {
-                millis += rng.nextLong(125, 2_000)
+                millis += rng.nextLong(100, 2_000)
                 val down = rng.nextBoolean()
                 match.turn(down, millis)
                 match.step()
@@ -91,6 +93,15 @@ class WheelTest {
         slow.step()
         fast.step()
         assertEquals(Paddle.CENTRE_TOP + 6 * 40, slow.playerTarget)
-        assertEquals(Paddle.CENTRE_TOP + 40 + 5 * 80, fast.playerTarget, "the first Detent of a spin is lone")
+        assertEquals(Paddle.CENTRE_TOP + 40 + 5 * 60, fast.playerTarget, "the first Detent of a spin is lone; 25 a second earns 60 px")
+    }
+
+    @Test
+    fun `turn returns the Detent rate it applied, and nothing outside play`() {
+        val match = Match(1, Difficulty.NORMAL)
+        val rate = DetentRate()
+        for (at in listOf(0L, 40L, 80L, 300L, 310L, 320L)) assertEquals(rate.detent(at), match.turn(down = true, atMillis = at))
+        match.pause()
+        assertNull(match.turn(down = true, atMillis = 330))
     }
 }

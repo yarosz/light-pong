@@ -76,8 +76,6 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
     /** How long the field's last draw took, measured around [drawField] on the main thread. */
     var drawNanos = 0L
 
-    private var benchmarkNanos = 0L
-
     init {
         update { if (BuildConfig.BENCHMARK_RALLY && match == null) startBenchmarkRally() }
     }
@@ -93,28 +91,18 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
     }
 
     fun frame(intervalNanos: Long) {
-        if (BuildConfig.BENCHMARK_RALLY) benchmarkFrame(intervalNanos)
+        var benchmarkDone = false
         update {
+            if (BuildConfig.BENCHMARK_RALLY) benchmarkDone = benchmarkFrame(intervalNanos)
             advance(intervalNanos)?.let { tones?.play(it) }
             wheelQuiet(SystemClock.uptimeMillis())
         }
+        if (benchmarkDone) Log.d(PERF_TAG, "done")
         val current = match
         if (shell.mode == Mode.PLAY && current?.phase == Phase.Rally) {
             frameLog.record(intervalNanos, current.frameSteps, drawNanos, abs(current.ball.vx))?.let { Log.d(PERF_TAG, it) }
         } else {
             frameLog.reset()
-        }
-    }
-
-    /** The benchmark build only (decision log D30): keeps the Rally endless, then pauses after [BENCHMARK_NANOS]. */
-    private fun benchmarkFrame(intervalNanos: Long) {
-        if (shell.mode != Mode.PLAY) return
-        benchmarkNanos += intervalNanos
-        if (benchmarkNanos < BENCHMARK_NANOS) {
-            match?.benchmarkRally()
-        } else {
-            update { pause() }
-            Log.d(PERF_TAG, "done")
         }
     }
 
@@ -140,7 +128,6 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
         const val TAG = "Pong"
         const val EVENT_TAG = "PongEvent"
         const val PERF_TAG = "PongPerf"
-        const val BENCHMARK_NANOS = 30_000_000_000L
     }
 }
 

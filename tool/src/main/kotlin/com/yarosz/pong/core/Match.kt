@@ -83,11 +83,14 @@ class Match(val seed: Long, val difficulty: Difficulty, val sensitivity: Sensiti
     /**
      * Queues one Detent for the next Step, [down] or up, moving the Paddle target by the [sensitivity]'s
      * step for the Detent rate at [atMillis], the key's event time in uptime ms (DESIGN.md item 20).
+     * Returns that rate, the one source of the spin lines' `peak_rate`, or null outside play.
      */
-    fun turn(down: Boolean, atMillis: Long) {
-        if (!inPlay) return
-        val step = sensitivity.step(detentRate.detent(atMillis))
+    fun turn(down: Boolean, atMillis: Long): Double? {
+        if (!inPlay) return null
+        val rate = detentRate.detent(atMillis)
+        val step = sensitivity.step(rate)
         pendingMoves.addLast(if (down) step else -step)
+        return rate
     }
 
     /** Queues a touch drag of [dy] field pixels for the next step. */
@@ -112,7 +115,6 @@ class Match(val seed: Long, val difficulty: Difficulty, val sensitivity: Sensiti
     fun pause() {
         if (!inPlay) return
         paused = true
-        frameUnits = HALF_STEP_UNITS
         pendingMoves.clear()
     }
 
@@ -131,9 +133,9 @@ class Match(val seed: Long, val difficulty: Difficulty, val sensitivity: Sensiti
      * Runs the whole steps that fit in [frameNanos], clamped to [MAX_FRAME_NANOS], carrying the
      * remainder to the next frame. Returns the sounds those steps made, in order.
      *
-     * The remainder starts half a Step from a boundary ([HALF_STEP_UNITS]), and a pause puts it back
-     * there. A 60 Hz frame is 3.99999984 Steps, so a remainder near a boundary turns microseconds of
-     * vsync jitter into frames of 3 and 5 Steps (decision log D30).
+     * The remainder starts half a Step from a boundary ([HALF_STEP_UNITS]). A 60 Hz frame is 3.99999984
+     * Steps, so a remainder near a boundary turns microseconds of vsync jitter into frames of 3 and 5
+     * Steps (decision log D30). A pause keeps the remainder, so the paused picture does not move.
      */
     fun advance(frameNanos: Long): List<SoundEvent> {
         frameSteps = 0
@@ -170,20 +172,14 @@ class Match(val seed: Long, val difficulty: Difficulty, val sensitivity: Sensiti
     }
 
     /**
-     * The benchmark build's endless Rally (decision log D30), called once a frame: a pending Serve
-     * launches at [Ball.MAX_SPEED], and both Paddles are set centred on the Ball's line, so neither misses.
+     * Sets the Ball and puts both Paddles at [paddleTop], for the benchmark build's endless Rally and
+     * FramePacingTest's (decision log D30). Outside them nothing sets the state directly.
      */
-    internal fun benchmarkRally() {
-        if (!inPlay) return
-        if (phase is Phase.PlayerServe || phase is Phase.ComputerServe) {
-            launch(toward = Side.COMPUTER)
-            val factor = Ball.MAX_SPEED / Ball.SERVE_SPEED
-            ball = ball.copy(vx = ball.vx * factor, vy = ball.vy * factor)
-        }
-        val top = Paddle.clampTop(ball.cy - Paddle.HALF_LENGTH)
-        playerTarget = top
-        playerTop = top
-        computer.place(top)
+    internal fun place(ball: Ball, paddleTop: Double) {
+        this.ball = ball
+        playerTarget = paddleTop
+        playerTop = paddleTop
+        computer.top = paddleTop
     }
 
     private fun applyPendingMoves() {

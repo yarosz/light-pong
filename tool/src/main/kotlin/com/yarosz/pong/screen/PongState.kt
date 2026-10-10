@@ -1,11 +1,14 @@
 package com.yarosz.pong.screen
 
+import com.yarosz.pong.core.Ball
 import com.yarosz.pong.core.Difficulty
 import com.yarosz.pong.core.Match
+import com.yarosz.pong.core.Paddle
 import com.yarosz.pong.core.Phase
 import com.yarosz.pong.core.Sensitivity
 import com.yarosz.pong.core.Side
 import com.yarosz.pong.core.SoundEvent
+import kotlin.math.abs
 
 /** What the screen shows (DESIGN.md item 31): Play covers every in-match Phase that is not Paused. */
 enum class Mode { TITLE, PLAY, PAUSED, OVER }
@@ -84,6 +87,9 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
     private val log = mutableListOf("state=title")
     private val burst = BurstLog()
 
+    /** Frame time of the benchmark Rally so far; null outside it. */
+    private var benchmarkNanos: Long? = null
+
     val mode: Mode
         get() {
             val current = match ?: return Mode.TITLE
@@ -117,7 +123,7 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
     }
 
     /** One wheel [command]; [atMillis] is its key's event time, which only a turn in play reads. */
-    fun command(command: Command, atMillis: Long = 0) = tracked {
+    fun command(command: Command, atMillis: Long) = tracked {
         val current = match
         when (mode) {
             Mode.TITLE -> when (command) {
@@ -127,8 +133,8 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
             }
             Mode.PLAY -> when (command) {
                 Command.UP, Command.DOWN -> {
-                    current?.turn(down = command == Command.DOWN, atMillis = atMillis)
-                    burst.detent(atMillis)?.let { log += it }
+                    val rate = current?.turn(down = command == Command.DOWN, atMillis = atMillis)
+                    if (rate != null) burst.detent(atMillis, rate)?.let { log += it }
                 }
                 Command.CLICK -> current?.click()
             }
@@ -185,7 +191,41 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
     /** The benchmark build only (decision log D30): opens straight into the endless Rally at the speed cap. */
     fun startBenchmarkRally() = tracked {
         startMatch(settings.difficulty)
-        match?.benchmarkRally()
+        benchmarkNanos = 0
+        holdBenchmarkRally()
+    }
+
+    /**
+     * The benchmark build only, once a frame before [advance]: keeps the Rally endless for
+     * [BENCHMARK_NANOS] of frames in play, then pauses. Returns true on the frame that ends the run,
+     * once; after it the Match plays as any other.
+     */
+    fun benchmarkFrame(intervalNanos: Long): Boolean {
+        var finished = false
+        tracked {
+            val elapsed = benchmarkNanos ?: return@tracked
+            if (mode != Mode.PLAY) return@tracked
+            if (elapsed + intervalNanos < BENCHMARK_NANOS) {
+                benchmarkNanos = elapsed + intervalNanos
+                holdBenchmarkRally()
+            } else {
+                benchmarkNanos = null
+                match?.pause()
+                finished = true
+            }
+        }
+        return finished
+    }
+
+    /** Serves a pending Serve, holds the Ball at the speed cap, and puts both Paddles on its line, so neither misses. */
+    private fun holdBenchmarkRally() {
+        val current = match ?: return
+        current.serve()
+        if (current.phase != Phase.Rally) return
+        val ball = current.ball
+        val factor = Ball.MAX_SPEED / abs(ball.vx)
+        val capped = ball.copy(vx = ball.vx * factor, vy = ball.vy * factor)
+        current.place(capped, Paddle.clampTop(capped.cy - Paddle.HALF_LENGTH))
     }
 
     private fun activate(row: TitleRow) {
@@ -216,7 +256,7 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
 
     private fun startMatch(difficulty: Difficulty) {
         val seed = newSeed()
-        log += "match seed=$seed difficulty=${difficulty.name.lowercase()}"
+        log += "match seed=$seed difficulty=${difficulty.name.lowercase()} sensitivity=${settings.sensitivity.name.lowercase()}"
         match = Match(seed, difficulty, settings.sensitivity)
     }
 
@@ -276,10 +316,11 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
         }
     }
 
-    private companion object {
-        const val POINT = "point"
+    companion object {
+        const val BENCHMARK_NANOS = 30_000_000_000L
+        private const val POINT = "point"
 
-        fun phaseName(phase: Phase) = when (phase) {
+        private fun phaseName(phase: Phase) = when (phase) {
             is Phase.PlayerServe -> "serve=player"
             is Phase.ComputerServe -> "serve=computer"
             is Phase.Rally -> "rally"

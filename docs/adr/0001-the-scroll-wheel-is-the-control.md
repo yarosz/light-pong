@@ -44,9 +44,12 @@ taps on rows. Everything works by wheel alone.
 The owner played 0.1.0 on the phone and found the 40 px step "a little slow if I need to move
 quickly, but works generally". He chose a rate-based step with a capped ramp and a Sensitivity
 setting (decision log D31), which supersedes "There is no acceleration" above and the third
-considered option. A Detent now moves the Paddle target 40 px at 8 Detents a second or slower,
-rising linearly to 80 px at 25 a second, capped; the Detent rate comes from the keys' event times
-over the last 100 ms. Fast multiplies the curve by 1.5. A slow spin still moves exactly 40 px a
+considered option. A Detent now moves the Paddle target 40 px at 10 Detents a second or slower,
+rising linearly to 80 px at 40 a second, capped; the Detent rate comes from the keys' event times
+over the last 100 ms. Fast multiplies the curve by 1.5. The knees were first 8 and 25 a second and
+were amended in review: a 100 ms window cannot read a rate between 0 and 10 a second, and a short
+spin is 20 to 40 events, so a ramp ending at 25 would cap almost every spin. Both knees are to be
+confirmed from the `spin` lines. A slow spin still moves exactly 40 px a
 Detent, so the precise end of the control feels as it did, and the cap keeps the fastest spin
 learnable. The core stays deterministic: the event times are inputs, so the same Seed and the same
 timed calls replay the same Match. Each spin logs one `spin` line, so the curve can be tuned against

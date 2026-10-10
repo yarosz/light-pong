@@ -2,8 +2,8 @@
 # The frame benchmark on a device (decision log D30). Builds and installs the benchmark Tool (the
 # `benchmark` build type: release, R8 on, not debuggable, dev-signed, same applicationId), which opens
 # straight into an endless Rally at the 1170 px/s cap and logs PongPerf lines for 30 s. Prints P50/P90
-# of every PongPerf key (frame_ms, steps, draw_ms, speed) with lp3-measure's p90.py, and how many
-# frames ran each number of Steps.
+# of every PongPerf key (frame_ms, steps, draw_ms, speed) with scripts/p90.py, and how many frames
+# ran each number of Steps.
 #
 #   scripts/bench.sh <adb serial>        (mise run bench <serial>)
 #
@@ -13,9 +13,9 @@
 # The installed benchmark build replaces the Tool on the device: reinstall the release or debug build
 # afterwards. The first PongPerf line (60 frames) is a warm-up and is left out.
 #
-# LP3_P90 points at p90.py (default: the newest lp3 plugin in the Claude plugin cache). For
-# scripts/bench-test.sh only: BENCH_ADB replaces adb, BENCH_APK a prebuilt APK (no Gradle), and
-# BENCH_DEADLINE_S the 90 s wait for the "done" line.
+# LP3_P90 points at another p90.py (default: scripts/p90.py). For scripts/bench-test.sh only:
+# BENCH_ADB replaces adb, BENCH_APK a prebuilt APK (no Gradle), and BENCH_DEADLINE_S the 90 s wait
+# for the "done" line.
 set -euo pipefail
 
 [ $# -eq 1 ] && [ -n "$1" ] || { echo "usage: scripts/bench.sh <adb serial>" >&2; exit 2; }
@@ -24,7 +24,7 @@ die() { echo "bench: $1" >&2; exit 1; }
 
 cd "$(git rev-parse --show-toplevel)"
 adb="${BENCH_ADB:-${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb}"
-p90=${LP3_P90:-$(ls -d "$HOME"/.claude/plugins/cache/lightphone-dev/lp3/*/skills/lp3-measure/scripts/p90.py 2>/dev/null | sort -V | tail -1)}
+p90=${LP3_P90:-scripts/p90.py}
 [ -f "$p90" ] || die "no p90.py (set LP3_P90)"
 pkg=com.yarosz.pong
 a() { "$adb" -s "$serial" "$@"; }

@@ -71,8 +71,8 @@ vy flips at the walls. The ball can leave only across a goal line.
 
 #### 13. Simulation
 
-- Fixed 240 Hz step, frame time clamped to 50 ms. The carried remainder starts half a step from a step boundary, and a pause puts it back there, so vsync jitter cannot flip 60 Hz frames between 3 and 5 steps (D30).
-- The ball and both paddles are drawn blended between the last two steps by the remainder's fraction of a step, one step (4.2 ms) behind the simulation. The blend never feeds back into the simulation (D30).
+- Fixed 240 Hz step, frame time clamped to 50 ms. The carried remainder starts half a step from a step boundary, so vsync jitter cannot flip 60 Hz frames between 3 and 5 steps (D30). A pause keeps the remainder, so the paused picture does not move.
+- The ball and both paddles are drawn blended between the last two steps by the remainder's fraction of a step, one step (4.2 ms) behind the clock. The blend never feeds back into the simulation (D30).
 - Swept collisions, so the ball never tunnels through a paddle.
 - Deterministic given the match seed plus timestamped inputs.
 - Separate RNG streams for serves and for the computer, derived from the match seed.
@@ -129,10 +129,10 @@ CCW 317 moves the paddle (or the selection) up, CW 318 moves it down. This lives
 Every 317/318 key-down (any repeatCount) is one Detent, and it moves the target by step(rate) × the Sensitivity's factor, clamped to [0, 976] (D31). Detents past an end are consumed and discarded. Key-ups are consumed and ignored.
 
 - Rate: the Detent rate in Detents a second, measured from the keys' event times (`KeyEvent.eventTime`, uptime ms) over the Detents of the last 100 ms, this one included: n Detents spanning t ms read (n − 1)/t. A lone Detent reads 0.
-- Step: 40 px at a rate of 8 a second or less, rising linearly to 80 px at 25 a second or more, capped there. Never below 40 px at Normal. No exponential curve.
+- Step: 40 px at a rate of 10 a second or less, rising linearly to 80 px at 40 a second or more, capped there. Never below 40 px at Normal. No exponential curve. 10 a second is the slowest rate the 100 ms window reads above 0, and 40 a second sits above a typical spin, so the ramp covers real spins. Both are to be confirmed from the `spin` lines (D31).
 - Sensitivity: Normal multiplies the step by 1, Fast by 1.5 (60 to 120 px). Normal by default; the choice persists (item 25).
 
-The paddle eases to the target in the core with tau 30 ms (`alpha = 1 − exp(−(1/240)/0.030)`), snapping within 0.5 px. Collision uses the eased position, which equals the drawn position. Inputs are queued with their event times and applied at the start of the next physics step, and none are dropped. During play, each spin (Detents with no gap of 150 ms) logs one `spin` PongEvent line when it ends (AGENTS.md, "Measuring frames and spins").
+The paddle eases to the target in the core with tau 30 ms (`alpha = 1 − exp(−(1/240)/0.030)`), snapping within 0.5 px. Collision uses the eased position; the renderer draws it blended one Step behind the clock (item 13). Inputs are queued with their event times and applied at the start of the next physics step, and none are dropped. During play, each spin (Detents with no gap of 150 ms) logs one `spin` PongEvent line when it ends (AGENTS.md, "Measuring frames and spins").
 
 #### 21. Click (319)
 

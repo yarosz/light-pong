@@ -3,7 +3,7 @@ package com.yarosz.pong.screen
 import kotlin.math.roundToInt
 
 /**
- * Frames during a Rally, batched [BATCH] to a PongPerf line for lp3-measure's p90.py. Each frame adds
+ * Frames during a Rally, batched [BATCH] to a PongPerf line for scripts/p90.py. Each frame adds
  * `frame_ms=16.6 steps=4 draw_ms=0.42`; the line ends with the Ball's `speed=1170` (|vx| in px/s) at
  * its last frame. The key names are frozen (AGENTS.md). The buffers are reused; only the finished line
  * allocates.

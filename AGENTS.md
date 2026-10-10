@@ -49,7 +49,9 @@ AI, bot, tick, ...) stay out of type names.
   - The package root: the Android side. `PongScreen.kt` (the `LightScreen`, its view model and the
     `withFrameNanos` frame loop), `FieldRenderer.kt`, `Menus.kt` and `Tones.kt` (the `AudioTrack`s).
 - `scripts/`: `ci.sh`, `light-build.sh`, `emulator-build.sh`, `pong-emu.sh`, `domain-drift.sh`, and
-  `bench.sh` with its fake-adb check `bench-test.sh`; `scripts/emulator/` builds and checks the Pong AVD.
+  `bench.sh` with `p90.py` and its check `bench-test.sh`, which runs against the fake adb in
+  `scripts/fake-adb/` (no device, no plugin; `ci.sh` runs it with the unit tests); `scripts/emulator/`
+  builds and checks the Pong AVD.
 - `mise.toml`, `.mise/tasks/ui`: toolchain and commands; run `mise tasks`.
 
 ## Rules this repo keeps
@@ -96,7 +98,7 @@ AI, bot, tick, ...) stay out of type names.
 ## Measuring frames and spins
 
 During a Rally every build logs one `PongPerf` line a second (debug level), 60 frames to a line, for
-lp3-measure's `p90.py`. The key names are frozen; scripts parse them:
+`scripts/p90.py` (vendored from the lp3 plugin's lp3-measure). The key names are frozen; scripts parse them:
 
 - `frame_ms`: the frame's interval, to 0.1 ms.
 - `steps`: the Steps that frame ran (4 at 60 Hz; D30).
@@ -110,7 +112,12 @@ frozen too:
 
 - `spin detents`: the Detents in the spin.
 - `ms`: from its first Detent to its last, in event-time ms.
-- `peak_rate`: the fastest Detent rate among them, in Detents a second, rounded.
+- `peak_rate`: the fastest Detent rate the Match applied among them (the rate `Match.turn` returns), in
+  Detents a second, rounded.
+
+Each Match starts with one `PongEvent` line, `match seed=<n> difficulty=<easy|normal|hard>
+sensitivity=<normal|fast>`, so a `spin` line can be read against the curve it ran on. Its keys
+(`match seed`, `difficulty`, `sensitivity`) are frozen too.
 
 `mise run bench <serial>` builds the `benchmark` build type (release with `BuildConfig.BENCHMARK_RALLY`:
 not debuggable, dev-signed, same applicationId), installs it over the Tool, and opens straight into an
