@@ -37,3 +37,4 @@ the pure core are the ones reviews keep checking.
 | N8 | Release 0.1.0 (`RELEASING.md`) | Signed tag `v0.1.0` on the merge commit; the GitHub Release is latest, with the notes (no APK) |
 | N9 | Go public | The lp3-prepublish scan of a fresh public clone prints `clean`, two privacy reviews find nothing, and `main` requires `build` and `signoff/emulator` (branch protection needs a public repo) |
 | N10 | Light's Tool Library (the maintainer) | Light's build of the `v0.1.0` commit succeeds and shows as pending approval |
+| N11 | Frame judder fix on the LP3 (D30) | `mise run bench <serial>` on the phone shows 4 Steps a frame, or the rare 3 or 5 its display period explains, with `draw_ms` well under a frame; and a Rally at the cap looks smooth by eye, which only the phone can show |

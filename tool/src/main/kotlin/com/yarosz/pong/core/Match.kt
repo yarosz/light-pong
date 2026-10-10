@@ -7,6 +7,7 @@ import kotlin.random.Random
  * One match against the computer, first to [WINNING_SCORE]. The simulation runs in fixed steps of
  * 1/240 s: the same seed and the same calls in the same order give the same match, bit for bit.
  * The renderer reads the public state each frame; it changes only through the input calls and [advance].
+ * It draws the `drawn` positions, which blend the last two Steps and never feed back into the simulation.
  */
 class Match(val seed: Long, val difficulty: Difficulty) {
 
@@ -47,7 +48,30 @@ class Match(val seed: Long, val difficulty: Difficulty) {
     val computerTop get() = computer.top
 
     private val pendingMoves = ArrayDeque<Double>()
-    private var frameUnits = 0L
+
+    /** Elapsed time not yet run as Steps, in nanoseconds x [STEPS_PER_SECOND]; one Step is [NANOS_PER_SECOND]. */
+    private var frameUnits = HALF_STEP_UNITS
+
+    /** Steps run by the last [advance]. */
+    var frameSteps = 0
+        private set
+
+    private var previousBall = ball
+    private var previousPlayerTop = playerTop
+    private var previousComputerTop = computerTop
+
+    /** How far the time not yet run reaches into the next Step, in [0, 1). */
+    private val stepFraction get() = frameUnits.toDouble() / NANOS_PER_SECOND
+
+    /**
+     * The Ball to draw: [visibleBall] blended from the Step before by [stepFraction], so every frame shows
+     * the same moment one Step back and a frame that runs 3 or 5 Steps still draws even motion.
+     */
+    val drawnBall: Ball? get() = visibleBall?.let { it.copy(cx = blend(previousBall.cx, it.cx), cy = blend(previousBall.cy, it.cy)) }
+    val drawnPlayerTop get() = blend(previousPlayerTop, playerTop)
+    val drawnComputerTop get() = blend(previousComputerTop, computerTop)
+
+    private fun blend(from: Double, to: Double) = from + (to - from) * stepFraction
 
     val visibleBall: Ball? get() = ball.takeUnless { phase is Phase.PointPause || phase is Phase.MatchOver }
     private val inPlay get() = !paused && phase !is Phase.MatchOver
@@ -82,7 +106,7 @@ class Match(val seed: Long, val difficulty: Difficulty) {
     fun pause() {
         if (!inPlay) return
         paused = true
-        frameUnits = 0
+        frameUnits = HALF_STEP_UNITS
         pendingMoves.clear()
     }
 
@@ -100,19 +124,30 @@ class Match(val seed: Long, val difficulty: Difficulty) {
     /**
      * Runs the whole steps that fit in [frameNanos], clamped to [MAX_FRAME_NANOS], carrying the
      * remainder to the next frame. Returns the sounds those steps made, in order.
+     *
+     * The remainder starts half a Step from a boundary ([HALF_STEP_UNITS]), and a pause puts it back
+     * there. A 60 Hz frame is 3.99999984 Steps, so a remainder near a boundary turns microseconds of
+     * vsync jitter into frames of 3 and 5 Steps (decision log D30).
      */
     fun advance(frameNanos: Long): List<SoundEvent> {
+        frameSteps = 0
         if (!inPlay) return emptyList()
         frameUnits += frameNanos.coerceIn(0, MAX_FRAME_NANOS) * STEPS_PER_SECOND
-        var steps = frameUnits / NANOS_PER_SECOND
+        val steps = (frameUnits / NANOS_PER_SECOND).toInt()
         frameUnits %= NANOS_PER_SECOND
         val sounds = mutableListOf<SoundEvent>()
-        while (steps-- > 0 && inPlay) sounds += step()
+        while (frameSteps < steps && inPlay) {
+            sounds += step()
+            frameSteps++
+        }
         return sounds
     }
 
     internal fun step(): List<SoundEvent> {
         if (!inPlay) return emptyList()
+        previousBall = ball
+        previousPlayerTop = playerTop
+        previousComputerTop = computerTop
         val sounds = mutableListOf<SoundEvent>()
         applyPendingMoves()
         easePlayer()
@@ -126,6 +161,23 @@ class Match(val seed: Long, val difficulty: Difficulty) {
             is Phase.MatchOver -> Unit
         }
         return sounds
+    }
+
+    /**
+     * The benchmark build's endless Rally (decision log D30), called once a frame: a pending Serve
+     * launches at [Ball.MAX_SPEED], and both Paddles are set centred on the Ball's line, so neither misses.
+     */
+    internal fun benchmarkRally() {
+        if (!inPlay) return
+        if (phase is Phase.PlayerServe || phase is Phase.ComputerServe) {
+            launch(toward = Side.COMPUTER)
+            val factor = Ball.MAX_SPEED / Ball.SERVE_SPEED
+            ball = ball.copy(vx = ball.vx * factor, vy = ball.vy * factor)
+        }
+        val top = Paddle.clampTop(ball.cy - Paddle.HALF_LENGTH)
+        playerTarget = top
+        playerTop = top
+        computer.place(top)
     }
 
     private fun applyPendingMoves() {
@@ -150,6 +202,7 @@ class Match(val seed: Long, val difficulty: Difficulty) {
 
     private fun afterPoint() {
         ball = Ball.AT_CENTRE
+        previousBall = ball
         phase = when {
             playerScore == WINNING_SCORE -> Phase.MatchOver(Side.PLAYER)
             computerScore == WINNING_SCORE -> Phase.MatchOver(Side.COMPUTER)
@@ -167,6 +220,7 @@ class Match(val seed: Long, val difficulty: Difficulty) {
         const val WINNING_SCORE = 11
         const val NANOS_PER_SECOND = 1_000_000_000L
         const val MAX_FRAME_NANOS = 50_000_000L
+        private const val HALF_STEP_UNITS = NANOS_PER_SECOND / 2
 
         const val COMPUTER_SERVE_STEPS = 192
         /** The 0.6 s of both the Point pause and the Hold (C2). */

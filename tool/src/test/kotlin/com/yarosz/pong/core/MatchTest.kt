@@ -261,11 +261,11 @@ class MatchTest {
     }
 
     @Test
-    fun `frames carry their remainder so 60 Hz frames average 4 steps`() {
+    fun `frames carry their remainder, from half a step, so 60 Hz frames average 4 steps`() {
         val match = newMatch()
         repeat(60) { match.advance(nanos(1.0 / 60)) }
         assertEquals(240, match.phaseSteps)
-        repeat(7) { match.advance(nanos(0.001)) }
+        repeat(3) { match.advance(nanos(0.001)) }
         assertEquals(241, match.phaseSteps)
     }
 

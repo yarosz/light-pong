@@ -15,7 +15,7 @@ import com.yarosz.pong.screen.Letterbox
 private val PLAYER_DIGITS = Array(Match.WINNING_SCORE + 1) { FieldLayout.scoreRects(it, FieldLayout.PLAYER_SCORE_X) }
 private val COMPUTER_DIGITS = Array(Match.WINNING_SCORE + 1) { FieldLayout.scoreRects(it, FieldLayout.COMPUTER_SCORE_X) }
 
-/** DESIGN.md items 1-7, in draw order: digits, centre line, pause bars, paddles, ball. */
+/** DESIGN.md items 1-7, in draw order: digits, centre line, pause bars, paddles, ball. Paddles and ball are the Match's drawn (blended) positions. */
 fun DrawScope.drawField(match: Match, pauseBars: Boolean) {
     val box = Letterbox(size.width, size.height)
     withTransform({
@@ -26,9 +26,9 @@ fun DrawScope.drawField(match: Match, pauseBars: Boolean) {
         COMPUTER_DIGITS[match.computerScore].forEach(::rect)
         centreLine()
         if (pauseBars) pauseBars()
-        paddle(Paddle.PLAYER_LEFT, match.playerTop)
-        paddle(Paddle.COMPUTER_LEFT, match.computerTop)
-        match.visibleBall?.let { ball(it) }
+        paddle(Paddle.PLAYER_LEFT, match.drawnPlayerTop)
+        paddle(Paddle.COMPUTER_LEFT, match.drawnComputerTop)
+        match.drawnBall?.let { ball(it) }
     }
 }
 

@@ -33,6 +33,11 @@ class Computer internal constructor(val difficulty: Difficulty, private val rng:
         current?.let { it.waitedSteps++ }
     }
 
+    /** The benchmark build's endless Rally only ([Match.benchmarkRally]). */
+    internal fun place(top: Double) {
+        this.top = top
+    }
+
     internal fun intercept(ball: Ball): Double =
         if (difficulty.predictsIntercept) interceptY(ball, Paddle.face(Side.COMPUTER) - Ball.HALF) else ball.cy
 

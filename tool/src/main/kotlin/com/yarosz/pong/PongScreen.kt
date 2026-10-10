@@ -52,6 +52,7 @@ import com.yarosz.pong.screen.Mode
 import com.yarosz.pong.screen.PongOwner
 import com.yarosz.pong.screen.PongState
 import com.yarosz.pong.screen.SettingsFile
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -71,8 +72,13 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
 
     private val frameLog = FrameLog()
 
+    /** How long the field's last draw took, measured around [drawField] on the main thread. */
+    var drawNanos = 0L
+
+    private var benchmarkNanos = 0L
+
     init {
-        update {}
+        update { if (BuildConfig.BENCHMARK_RALLY && match == null) startBenchmarkRally() }
     }
 
     fun update(block: PongState.() -> Unit) {
@@ -86,11 +92,25 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
     }
 
     fun frame(intervalNanos: Long) {
+        if (BuildConfig.BENCHMARK_RALLY) benchmarkFrame(intervalNanos)
         update { advance(intervalNanos)?.let { tones?.play(it) } }
-        if (shell.mode == Mode.PLAY && match?.phase == Phase.Rally) {
-            frameLog.record(intervalNanos)?.let { Log.d(PERF_TAG, it) }
+        val current = match
+        if (shell.mode == Mode.PLAY && current?.phase == Phase.Rally) {
+            frameLog.record(intervalNanos, current.frameSteps, drawNanos, abs(current.ball.vx))?.let { Log.d(PERF_TAG, it) }
         } else {
             frameLog.reset()
+        }
+    }
+
+    /** The benchmark build only (decision log D30): keeps the Rally endless, then pauses after [BENCHMARK_NANOS]. */
+    private fun benchmarkFrame(intervalNanos: Long) {
+        if (shell.mode != Mode.PLAY) return
+        benchmarkNanos += intervalNanos
+        if (benchmarkNanos < BENCHMARK_NANOS) {
+            match?.benchmarkRally()
+        } else {
+            update { pause() }
+            Log.d(PERF_TAG, "done")
         }
     }
 
@@ -116,6 +136,7 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
         const val TAG = "Pong"
         const val EVENT_TAG = "PongEvent"
         const val PERF_TAG = "PongPerf"
+        const val BENCHMARK_NANOS = 30_000_000_000L
     }
 }
 
@@ -169,7 +190,9 @@ class PongScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, PongVi
         val touch = if (play) Modifier.pointerInput(Unit) { fieldGestures(vm) } else Modifier
         Canvas(Modifier.fillMaxSize().then(touch)) {
             vm.frame.intValue
+            val start = System.nanoTime()
             vm.match?.let { drawField(it, pauseBars = play) }
+            vm.drawNanos = System.nanoTime() - start
         }
         if (play) PauseControl { vm.update { tapField(FieldLayout.CENTRE_X.toDouble(), FieldLayout.PAUSE_TARGET_Y.toDouble()) } }
     }

@@ -190,3 +190,22 @@ resulting spec.
   released and the Tool plays silent; a failed play or stop is logged and skipped.
 - D29 The panel hint keeps its copy and wraps with balanced lines (`LineBreak.Heading`) when it does
   not fit on one line, so no word is left alone on the second line.
+
+## Build decisions (S4, frame judder; 2026-10-10)
+
+- D30 Frames at high speed are drawn evenly. Cause: `Match.advance` started its remainder at 0, and a
+  60 Hz frame is 3.99999984 Steps, so the remainder sat on a Step boundary and microseconds of vsync
+  jitter flipped frames between 3 and 5 Steps. With +-50 us jitter on 16,666,667 ns frames, 3,000
+  frames ran 708 x 3, 1,584 x 4 and 708 x 5 Steps (+-2 us still gave a third of the frames 3 or 5). At
+  the 1170 px/s cap the Ball was drawn moving 14.6 px, then 24.4 px, where 19.5 px was due. Frames were
+  not dropped (L1: 16.6 ms at P50 to max). Fix, in two parts. The remainder starts half a Step from a
+  boundary, and a pause puts it back there: the same feed then runs 4 Steps every frame. And the
+  renderer draws the Ball and both Paddles blended between the last two Steps by the remainder's
+  fraction of a Step (`Match.drawnBall`, `drawnPlayerTop`, `drawnComputerTop`), so a display whose
+  period is not exactly 4 Steps (L1's 16.6 ms gives a 3-Step frame about once a second) still draws
+  even motion: within 0.25 px a frame at the cap in `FramePacingTest`. The blend only reads; it never
+  feeds the simulation, so replays and `GoldenReplayTest` are unchanged. The picture is one Step
+  (4.2 ms) behind the simulation, Ball and Paddles alike, so a hit still shows where it happened. A
+  Point's return to the centre snaps instead of sweeping. The `benchmark` build type (release with
+  `BuildConfig.BENCHMARK_RALLY`) opens straight into an endless Rally at the cap for 30 s, and
+  `mise run bench <serial>` reports its PongPerf keys (`AGENTS.md`).

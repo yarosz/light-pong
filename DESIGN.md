@@ -71,7 +71,8 @@ vy flips at the walls. The ball can leave only across a goal line.
 
 #### 13. Simulation
 
-- Fixed 240 Hz step, frame time clamped to 50 ms.
+- Fixed 240 Hz step, frame time clamped to 50 ms. The carried remainder starts half a step from a step boundary, and a pause puts it back there, so vsync jitter cannot flip 60 Hz frames between 3 and 5 steps (D30).
+- The ball and both paddles are drawn blended between the last two steps by the remainder's fraction of a step, one step (4.2 ms) behind the simulation. The blend never feeds back into the simulation (D30).
 - Swept collisions, so the ball never tunnels through a paddle.
 - Deterministic given the match seed plus timestamped inputs.
 - Separate RNG streams for serves and for the computer, derived from the match seed.

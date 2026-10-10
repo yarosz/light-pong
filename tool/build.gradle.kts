@@ -24,6 +24,8 @@ android {
     defaultConfig {
         minSdk = rootProject.ext["minSdk"] as Int
         targetSdk = rootProject.ext["targetSdk"] as Int
+
+        buildConfigField("boolean", "BENCHMARK_RALLY", "false")
     }
 
     buildTypes {
@@ -36,6 +38,18 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             signingConfig = signingConfigs.getByName("lightsdkDev")
         }
+        // The frame benchmark (scripts/bench.sh, decision log D30): release, opening straight into an
+        // endless Rally at the speed cap for 30 s. Light's builder builds release only, where
+        // BENCHMARK_RALLY is false.
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            buildConfigField("boolean", "BENCHMARK_RALLY", "true")
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     lint {

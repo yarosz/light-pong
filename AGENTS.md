@@ -47,8 +47,8 @@ AI, bot, tick, ...) stay out of type names.
     `settings.txt`; `Tone.kt` generates the tones' samples.
   - The package root: the Android side. `PongScreen.kt` (the `LightScreen`, its view model and the
     `withFrameNanos` frame loop), `FieldRenderer.kt`, `Menus.kt` and `Tones.kt` (the `AudioTrack`s).
-- `scripts/`: `ci.sh`, `light-build.sh`, `emulator-build.sh`, `pong-emu.sh` and `domain-drift.sh`;
-  `scripts/emulator/` builds and checks the Pong AVD.
+- `scripts/`: `ci.sh`, `light-build.sh`, `emulator-build.sh`, `pong-emu.sh`, `domain-drift.sh`, and
+  `bench.sh` with its fake-adb check `bench-test.sh`; `scripts/emulator/` builds and checks the Pong AVD.
 - `mise.toml`, `.mise/tasks/ui`: toolchain and commands; run `mise tasks`.
 
 ## Rules this repo keeps
@@ -91,6 +91,22 @@ AI, bot, tick, ...) stay out of type names.
   back to another emulator. Never touch other emulators on the machine.
   Every raw adb call names its device with `-s`; never run `adb kill-server`.
 - When several sessions share one Light Phone III, take turns through a lease kept outside this repo (the lp3 plugin's `lp3-lease.sh`).
+
+## Measuring frames
+
+During a Rally every build logs one `PongPerf` line a second (debug level), 60 frames to a line, for
+lp3-measure's `p90.py`. The key names are frozen; scripts parse them:
+
+- `frame_ms`: the frame's interval, to 0.1 ms.
+- `steps`: the Steps that frame ran (4 at 60 Hz; D30).
+- `draw_ms`: the field's last draw, timed around `drawField` on the main thread, to 0.01 ms. It is the
+  draw recorded into the display list, not the GPU's work.
+- `speed`: the Ball's |vx| in px/s, once a line, at its last frame.
+
+`mise run bench <serial>` builds the `benchmark` build type (release with `BuildConfig.BENCHMARK_RALLY`:
+not debuggable, dev-signed, same applicationId), installs it over the Tool, and opens straight into an
+endless Rally at the 1170 px/s cap for 30 s, then prints P50/P90 of each key and the frames by Steps.
+Reinstall the normal build afterwards. Only the LP3's numbers mean anything; hold the phone lease.
 
 ## How changes land
 

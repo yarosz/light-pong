@@ -144,6 +144,12 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
      */
     fun pause() = tracked(reshown = true) { match?.pause() }
 
+    /** The benchmark build only (decision log D30): opens straight into the endless Rally at the speed cap. */
+    fun startBenchmarkRally() = tracked {
+        startMatch(settings.difficulty)
+        match?.benchmarkRally()
+    }
+
     private fun activate(row: TitleRow) {
         val difficulty = row.difficulty
         if (difficulty == null) {
