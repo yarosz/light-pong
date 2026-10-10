@@ -1,0 +1,11 @@
+# Names scripts/domain-drift.sh should not report: implementation and UI vocabulary, not domain terms.
+# One name per line, matched exactly. Domain terms go in CONTEXT.md instead.
+
+# The Tool's one screen and its view model (DESIGN.md item 31): UI plumbing named after the Tool.
+PongScreen
+PongViewModel
+
+# The swept collision in core/Rally.kt: a Contact is the first touch of the Ball on a Wall or Paddle
+# within a Step, and a Reach is a Paddle grown by half the Ball, the region the Ball's centre touches it.
+Contact
+Reach
