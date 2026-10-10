@@ -10,8 +10,8 @@ class ComputerTest {
     private val incoming = Ball(540.0, 100.0, Ball.SERVE_SPEED, 300.0)
 
     @Test
-    fun `reaction delays are whole steps, rounded up`() {
-        assertEquals(listOf(60, 36, 20), Difficulty.entries.map { it.reactionSteps })
+    fun `reaction delays are whole steps, rounded to nearest`() {
+        assertEquals(listOf(60, 36, 19), Difficulty.entries.map { it.reactionSteps })
     }
 
     @Test
@@ -41,7 +41,7 @@ class ComputerTest {
             val waiting = tops.take(difficulty.reactionSteps)
             assertEquals(List(waiting.size) { Paddle.CENTRE_TOP }, waiting, "$difficulty waits at centre")
             val moving = tops.drop(difficulty.reactionSteps - 1).zipWithNext { a, b -> b - a }
-            moving.forEach { assertEquals(-difficulty.maxSpeed / Match.STEPS_PER_SECOND, it, 1e-9, "$difficulty speed") }
+            moving.forEach { assertEquals(-difficulty.maxSpeed / STEPS_PER_SECOND, it, 1e-9, "$difficulty speed") }
         }
     }
 
@@ -51,7 +51,7 @@ class ComputerTest {
         repeat(400) { computer.step(incoming) }
         val start = computer.top
         computer.step(incoming.copy(vx = -Ball.SERVE_SPEED))
-        assertEquals(Difficulty.HARD.maxSpeed / 2 / Match.STEPS_PER_SECOND, computer.top - start, 1e-9)
+        assertEquals(Difficulty.HARD.maxSpeed / 2 / STEPS_PER_SECOND, computer.top - start, 1e-9)
         repeat(2_000) { computer.step(null) }
         assertEquals(Paddle.CENTRE_TOP, computer.top)
     }

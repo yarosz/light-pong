@@ -121,12 +121,14 @@ resulting spec.
   `advance` durations; that replays exactly.
 - D6 A Point is scored when the Ball's leading edge reaches a Goal line (its left edge at x ≤ 0, or its
   right edge at x ≥ 1080). The Ball in play therefore never leaves the Field, even in part.
-- D7 A Paddle can move onto a Ball that has passed its Face. That counts as an End cap hit on the nearer
-  cap (o = ±1, with the hit's speed-up and sound). If a Wall leaves no room beside that cap, the Ball is
-  set back in front of the Face and bounces with its Face offset.
+- D7 A Paddle can move onto a Ball. If the Ball moves toward it and has not wholly passed its Face, that
+  counts as an End cap hit on the nearer cap (o = ±1, with the hit's speed-up and sound), struck from in
+  front of the Face: the Ball is set at the Face, so its y never jumps. Revised by D23 and D24, which
+  replaced the earlier snap onto the cap (a y jump of up to 115 px) and its no-room fallback.
 - D8 End cap hits speed the Ball up like any Paddle hit (A3 says every hit).
 - D9 A Ball wedged between a Wall and an End cap can bounce many times in one Step. After 16 contacts it
-  waits out the rest of that Step instead of being moved through either.
+  slides straight on in x for the rest of that Step, which carries it out of the wedge; it never moves
+  through either. (It used to wait out the Step, which pinned a Ball against a Paddle parked at top 32.)
 - D10 During the Hold the frozen Ball is not solid, so a Paddle may be drawn over it; the first Rally
   Step resolves the overlap by D7.
 - D11 Pausing during the Hold and resuming restarts the full Hold.
@@ -134,7 +136,8 @@ resulting spec.
 - D13 An Approach starts on the first Step the Ball, in a Rally or Hold, moves toward the Computer, and
   ends when it moves away or no Ball is in play. The Aim (Contact offset, then Aim error) is rolled once
   per Approach from the Computer's stream.
-- D14 Reaction delays round up to whole Steps: Easy 60 (250 ms), Normal 36 (150 ms), Hard 20 (83 ms).
+- D14 Reaction delays round to the nearest whole Step: Easy 60 (250 ms), Normal 36 (150 ms), Hard 19
+  (79 ms for the table's 80 ms).
 - D15 The Computer steers its Paddle's centre to Intercept + Aim, clamped to its travel. Normal and Hard
   predict the Intercept the same way, folding at the Walls; the table's "predicted intercept" for Hard
   is read as the same prediction as Normal's.
@@ -152,5 +155,26 @@ resulting spec.
   (`WinRateSimulationTest`), a bot playing perfectly at 30 Detents a second never loses a Point. One
   that reacts 0.2 s late and misjudges by up to 48 px still wins every Match (Hard scores 0.73 a
   Match). Slowed to 15 Detents a second, it beats Easy 200/200 and Normal 198/200, and Hard 2/200.
+  Re-measured after D23 and D24: Hard concedes 0.82 a Match to the late bot; the slow bot beats Normal
+  197/200 and Hard 1/200. The simulation now runs only with `-Dpong.winrate=true`.
   The Computer's strength rests on the wheel rate a person sustains, which must be measured on the
   phone before the table is tuned.
+
+## Build decisions (S1b, review fixes; 2026-10-10)
+
+- D23 A Paddle hits the Ball at most once per Approach. A Ball moving away from a Paddle (vx pointing
+  away) is never hit by it: if the Paddle moves onto it, it is set in front of the Face with its
+  velocity unchanged, and if it meets an End cap in a sweep it glances off (vy flips) with no speed-up
+  and no sound. So one Step gives at most one speed-up and one paddle sound per Paddle. Before this, a
+  Paddle easing or chasing onto a Ball it had just struck hit it again every Step (vx 620 to 879 in six
+  Steps), and a Ball wedged between a Wall and a cap took up to 16 speed-ups in one Step.
+- D24 A Ball whose trailing edge is past a Paddle's Face (right edge at or behind x 72, or left edge at
+  or beyond x 1008) cannot be hit by that Paddle: it goes on to the Goal line. If the Paddle moves onto
+  it, it is set behind the Paddle (toward its goal) with nothing else changed; if it meets an End cap it
+  glances off without a hit. This keeps "never inside a Paddle" without exempting anything, and stops a
+  Paddle parked over a frozen Ball during the Hold from saving a lost Point.
+- D25 The Phases carry no data. The Match counts whole Steps in the current Phase in one `phaseSteps`
+  counter, restarted by every Phase change, by a resume, and by paddle input on the player's serve. The
+  Point pause and the Hold share one 0.6 s constant, `PAUSE_STEPS` (C2).
+- D26 `tan` and `exp` come from `StrictMath`, so the same code gives the same Match on any JVM or ART.
+  A golden test pins one recorded Match's final state.

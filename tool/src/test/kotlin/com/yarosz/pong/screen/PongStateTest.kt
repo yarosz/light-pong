@@ -50,7 +50,7 @@ class PongStateTest {
         assertEquals(Mode.PLAY, state.mode)
         assertEquals(Difficulty.EASY, state.match?.difficulty)
         assertEquals(Difficulty.EASY, state.settings.difficulty)
-        assertEquals(Phase.PlayerServe(), state.match?.phase)
+        assertEquals(Phase.PlayerServe, state.match?.phase)
         assertTrue(state.shell.awake)
         assertTrue(state.shell.servePrompt)
     }
@@ -96,7 +96,7 @@ class PongStateTest {
         state.command(Command.CLICK)
         state.command(Command.CLICK)
         assertEquals(Mode.PLAY, state.mode)
-        assertEquals(Phase.Hold(), state.match?.phase)
+        assertEquals(Phase.Hold, state.match?.phase)
     }
 
     @Test
@@ -147,7 +147,7 @@ class PongStateTest {
         assertNotSame(over, state.match)
         assertEquals(2L, state.match?.seed)
         assertEquals(Difficulty.EASY, state.match?.difficulty)
-        assertEquals(Phase.PlayerServe(), state.match?.phase)
+        assertEquals(Phase.PlayerServe, state.match?.phase)
         assertEquals(0, state.match?.playerScore)
     }
 

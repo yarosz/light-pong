@@ -3,6 +3,8 @@ package com.yarosz.pong.core
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,10 +22,17 @@ class MatchPropertiesTest {
     private val stepsPerMatch = 30_000
     private val eps = 1e-6
 
-    /** Random wheel, drag, click, serve, pause and resume calls; half the scripts also play like a bot. */
+    /**
+     * Random wheel, drag, click, serve, pause and resume calls; two thirds of the scripts also play like
+     * a bot. Every fourth script is extreme: it drags the paddle onto the ball every step, even after
+     * hitting it, and turns, drags and pauses in bigger bursts.
+     */
     private class Script(seed: Long) {
         private val rng = Random(seed xor 0x5EED)
         private val bot = PlayerBot(Random(seed), perfect = seed % 2 == 0L).takeIf { seed % 3 != 0L }
+        private val extreme = seed % 4 == 0L
+        private val wheel = if (extreme) 13 else 4
+        private val dragReach = if (extreme) 400.0 else 60.0
         private var pausedFor = 0
 
         fun act(match: Match) {
@@ -32,9 +41,10 @@ class MatchPropertiesTest {
                 return
             }
             bot?.act(match)
+            if (extreme) match.visibleBall?.let { match.drag(it.cy - Paddle.HALF_LENGTH - match.playerTarget) }
             when (rng.nextInt(1000)) {
-                in 0..79 -> match.turn(rng.nextInt(-3, 4))
-                in 80..99 -> match.drag(rng.nextDouble(-60.0, 60.0))
+                in 0..79 -> match.turn(rng.nextInt(-wheel + 1, wheel))
+                in 80..99 -> match.drag(rng.nextDouble(-dragReach, dragReach))
                 in 100..102 -> match.click()
                 in 103..112 -> match.serve()
                 113 -> {
@@ -112,6 +122,73 @@ class MatchPropertiesTest {
     }
 
     @Test
+    fun `the ball's speed changes only on a paddle hit, by one factor of 1_06, once per step`() = forAllSeeds { before, sounds, match ->
+        if (before.paused || before.phase != Phase.Rally) return@forAllSeeds
+        val hits = sounds.count { it == SoundEvent.PADDLE }
+        assertTrue(hits <= 1, "$hits paddle hits in one step")
+        val expected = if (hits == 1) min(abs(before.ball.vx) * Ball.SPEED_FACTOR, Ball.MAX_SPEED) else abs(before.ball.vx)
+        assertEquals(expected, abs(match.ball.vx), 1e-9, "|vx| after $hits hits")
+    }
+
+    @Test
+    fun `in a rally the ball's y moves no further than its vertical speed allows`() = forAllSeeds { before, _, match ->
+        if (before.paused || before.phase != Phase.Rally || match.phase != Phase.Rally) return@forAllSeeds
+        val reach = max(abs(before.ball.vy), abs(match.ball.vy)) * STEP_SECONDS
+        val moved = abs(match.ball.cy - before.ball.cy)
+        assertTrue(moved <= reach + 1e-6, "cy moved $moved, at most $reach")
+    }
+
+    @Test
+    fun `each paddle hits the ball at most once between centre-line crossings`() {
+        for (seed in 1L..seeds) {
+            var hits = 0
+            forEachStep(seed) { before, sounds, match ->
+                if (before.phase !is Phase.Rally && before.phase !is Phase.Hold) hits = 0
+                if ((before.ball.cx < Field.WIDTH / 2) != (match.ball.cx < Field.WIDTH / 2)) hits = 0
+                hits += sounds.count { it == SoundEvent.PADDLE }
+                assertTrue(hits <= 1, "$hits hits since the centre line")
+            }
+        }
+    }
+
+    @Test
+    fun `long sweeps never tunnel, double-hit or leave the field`() {
+        val rng = Random(2026)
+        val contact = mapOf(Side.PLAYER to PLAYER_CONTACT_X, Side.COMPUTER to Paddle.face(Side.COMPUTER) - Ball.HALF)
+        repeat(200_000) { case ->
+            val speed = rng.nextDouble(Ball.SERVE_SPEED, Ball.MAX_SPEED)
+            val angle = rng.nextDouble(-Ball.MAX_BOUNCE, Ball.MAX_BOUNCE)
+            val start = Ball(
+                rng.nextDouble(contact.getValue(Side.PLAYER), contact.getValue(Side.COMPUTER)),
+                rng.nextDouble(Ball.HALF, Field.HEIGHT - Ball.HALF),
+                if (rng.nextBoolean()) speed else -speed,
+                speed * kotlin.math.tan(angle),
+            )
+            val tops = mapOf(Side.PLAYER to rng.nextDouble(0.0, Paddle.MAX_TOP), Side.COMPUTER to rng.nextDouble(0.0, Paddle.MAX_TOP))
+            val seconds = rng.nextDouble(0.05, 0.3)
+            val result = rallyStep(start, tops.getValue(Side.PLAYER), tops.getValue(Side.COMPUTER), seconds)
+            val ball = result.ball
+            val context = "case $case: $start for $seconds s, tops $tops -> $ball ${result.sounds}"
+            val hits = result.sounds.count { it == SoundEvent.PADDLE }
+            assertTrue(hits <= 1, context)
+            val expected = if (hits == 1) min(speed * Ball.SPEED_FACTOR, Ball.MAX_SPEED) else speed
+            assertEquals(expected, abs(ball.vx), 1e-9, context)
+            assertTrue(ball.top >= -eps && ball.bottom <= Field.HEIGHT + eps, "beyond a wall: $context")
+            for ((side, top) in tops) {
+                val inside = ball.right > Paddle.left(side) + eps && ball.left < Paddle.left(side) + Paddle.THICKNESS - eps &&
+                    ball.bottom > top + eps && ball.top < top + Paddle.LENGTH - eps
+                assertTrue(!inside, "inside the $side paddle: $context")
+                val x = contact.getValue(side)
+                val crossed = if (side == Side.PLAYER) start.vx < 0 && ball.cx < x else start.vx > 0 && ball.cx > x
+                if (crossed && hits == 0) {
+                    val y = interceptY(start, x)
+                    assertTrue(y <= top - Ball.HALF + eps || y >= top + Paddle.LENGTH + Ball.HALF - eps, "crossed the $side face at y $y: $context")
+                }
+            }
+        }
+    }
+
+    @Test
     fun `the player paddle and its target stay within 0 to 976`() = forAllSeeds { _, _, match ->
         assertTrue(match.playerTarget in 0.0..Paddle.MAX_TOP, "target ${match.playerTarget}")
         assertTrue(match.playerTop in 0.0..Paddle.MAX_TOP, "top ${match.playerTop}")
@@ -120,7 +197,7 @@ class MatchPropertiesTest {
     @Test
     fun `the computer never moves faster than its max speed`() {
         for (seed in 1L..seeds) {
-            val maxStep = Difficulty.entries[(seed % 3).toInt()].maxSpeed / Match.STEPS_PER_SECOND
+            val maxStep = Difficulty.entries[(seed % 3).toInt()].maxSpeed / STEPS_PER_SECOND
             forEachStep(seed) { before, _, match ->
                 assertTrue(abs(match.computerTop - before.computerTop) <= maxStep + 1e-9, "moved ${match.computerTop - before.computerTop}")
                 assertTrue(match.computerTop in 0.0..Paddle.MAX_TOP)
@@ -138,7 +215,7 @@ class MatchPropertiesTest {
     }
 
     private fun record(seed: Long, frameRng: Random): List<Snapshot> {
-        val match = Match(seed, Difficulty.HARD)
+        val match = Match(seed, Difficulty.entries[(seed % 3).toInt()])
         val script = Script(seed)
         return (1..3_000).map {
             script.act(match)

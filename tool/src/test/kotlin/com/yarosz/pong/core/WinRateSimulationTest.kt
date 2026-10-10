@@ -1,5 +1,6 @@
 package com.yarosz.pong.core
 
+import org.junit.Assume.assumeTrue
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -8,6 +9,7 @@ import kotlin.test.assertEquals
  * A sanity check on the difficulty table, printed rather than asserted. The perfect player is limited
  * only by speed, 30 detents a second (1200 px/s). The human-like players also react 0.2 s late and
  * misjudge the intercept by up to a quarter of a paddle; the slow one turns 15 detents a second.
+ * It plays 1,800 Matches, so it runs only with -Dpong.winrate=true.
  */
 class WinRateSimulationTest {
 
@@ -42,6 +44,7 @@ class WinRateSimulationTest {
 
     @Test
     fun `win rates against each difficulty`() {
+        assumeTrue(System.getProperty("pong.winrate") == "true")
         val perfect = winRates("perfect, 30 detents/s") { PlayerBot(Random(it)) }
         val human = winRates("human-like, 30 detents/s, 0.2 s late, misjudges up to 48 px") {
             PlayerBot(Random(it), reactionSteps = 48, misjudgement = Paddle.LENGTH / 4)

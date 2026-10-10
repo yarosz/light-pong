@@ -7,6 +7,7 @@ import kotlin.random.Random
 /** Everything a renderer can read from a Match, as one comparable value. */
 data class Snapshot(
     val phase: Phase,
+    val phaseSteps: Int,
     val paused: Boolean,
     val playerScore: Int,
     val computerScore: Int,
@@ -16,7 +17,7 @@ data class Snapshot(
     val computerTop: Double,
 )
 
-fun Match.snapshot() = Snapshot(phase, paused, playerScore, computerScore, ball, playerTarget, playerTop, computerTop)
+fun Match.snapshot() = Snapshot(phase, phaseSteps, paused, playerScore, computerScore, ball, playerTarget, playerTop, computerTop)
 
 fun Match.steps(count: Int): List<SoundEvent> = (1..count).flatMap { step() }
 
@@ -43,7 +44,7 @@ class PlayerBot(
     private val reactionSteps: Int = 0,
     private val misjudgement: Double = 0.0,
 ) {
-    private val stepsPerDetent = Match.STEPS_PER_SECOND / detentsPerSecond
+    private val stepsPerDetent = STEPS_PER_SECOND / detentsPerSecond
     private var cooldown = 0
     private var aim = 0.0
     private var approaching = false

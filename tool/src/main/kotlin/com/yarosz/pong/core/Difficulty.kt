@@ -16,8 +16,8 @@ enum class Difficulty(
     HARD(80, 614.0, predictsIntercept = true, aimError = 0.08, contactOffset = 0.85),
     ;
 
-    /** The reaction delay rounded up to whole simulation steps. */
-    val reactionSteps get() = (reactionMillis * Match.STEPS_PER_SECOND + 999) / 1000
+    /** The reaction delay rounded to the nearest whole Step. */
+    val reactionSteps = (reactionMillis * STEPS_PER_SECOND + 500) / 1000
 
     companion object {
         val DEFAULT = NORMAL

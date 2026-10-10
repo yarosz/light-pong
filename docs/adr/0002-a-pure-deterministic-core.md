@@ -16,8 +16,11 @@ idle auto-pause, the Reaction delay) counts whole Steps, so 0.8 s is exactly 192
 
 Randomness comes from the Match's Seed. Two streams are derived from it, one for Serves and one for
 the Computer, so a change in how often the Computer rolls its Aim cannot shift the Serves. Wheel and
-drag input is queued and applied, in order, at the start of the next Step, none dropped. The same Seed
-with the same calls in the same order replays a Match bit for bit.
+drag input is queued and applied, in order, at the start of the next Step, none dropped. The same code
+with the same Seed and the same calls in the same order replays a Match bit for bit on any JVM or ART:
+the only transcendental functions, `tan` and `exp`, come from `StrictMath`, and the rest is IEEE double
+arithmetic. A change to the code may change replays; a golden test records one Match so that drift is
+caught and re-recorded on purpose.
 
 The Ball's collisions are swept: each Step finds the earliest contact with a Wall or a Paddle in the
 time left and bounces there, so no speed can carry the Ball through a Paddle. The player's Paddle
@@ -40,6 +43,8 @@ and collisions use the eased position, which is also the drawn one.
 - The core is tested on the JVM: property tests run hundreds of seeded Matches with random input and
   check the invariants after every Step.
 - A frame clock that hiccups costs at most 12 Steps (50 ms) of simulated time, never a burst.
-- A Paddle can move onto a Ball that has already passed its Face. The core treats that as an End cap
-  hit, or, when a Wall leaves no room beside the cap, sets the Ball back in front of the Face.
+- A Paddle can move onto the Ball. A Ball moving toward it and not wholly past its Face takes an End
+  cap hit from in front of the Face; any other Ball is only set clear of the Paddle (in front of the
+  Face if it is moving away, behind the Paddle if it is past the Face). Each Approach gets at most one
+  hit (D23, D24).
 - Each Match's Seed comes from the clock and is logged at debug level by the Tool; tests inject it.

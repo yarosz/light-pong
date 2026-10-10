@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class RallyTest {
 
-    private val step = Match.STEP_SECONDS
+    private val step = STEP_SECONDS
     private val far = Paddle.MAX_TOP
 
     private fun degrees(ball: Ball) = atan(ball.vy / ball.vx) * 180 / PI
@@ -47,7 +47,7 @@ class RallyTest {
     @Test
     fun `an end-cap hit counts as plus or minus one`() {
         val top = 500.0
-        val start = Ball(64.0, 470.0, -Ball.SERVE_SPEED, 900.0)
+        val start = Ball(74.0, 470.0, -Ball.SERVE_SPEED, 900.0)
         val (ball, _) = untilHit(start, top, far)
         assertTrue(ball.vx > 0)
         assertEquals(-50.0, degrees(ball), 1e-6)
@@ -55,12 +55,14 @@ class RallyTest {
     }
 
     @Test
-    fun `a paddle moving onto a ball behind its face strikes it with the end cap`() {
+    fun `a paddle moving onto a ball beside its face strikes it as an end cap, from in front of the face`() {
         val ball = Ball(60.0, 300.0, -Ball.SERVE_SPEED, 0.0)
         val result = rallyStep(ball, playerTop = 290.0, computerTop = far, seconds = step)
         assertEquals(listOf(SoundEvent.PADDLE), result.sounds)
         assertTrue(result.ball.vx > 0)
         assertEquals(-50.0, degrees(result.ball), 1e-6)
+        assertEquals(300.0 + result.ball.vy * step, result.ball.cy, 1e-9)
+        assertEquals(PLAYER_CONTACT_X + result.ball.vx * step, result.ball.cx, 1e-9)
     }
 
     @Test
@@ -109,6 +111,105 @@ class RallyTest {
         val result = rallyStep(start, top, far, seconds = 0.3)
         assertTrue(result.ball.vx > 0)
         assertNull(result.scorer)
+    }
+
+    /** Steps [start] against a player paddle whose top follows [tops], one per step. */
+    private fun run(start: Ball, tops: List<Double>): Pair<Ball, Int> {
+        var ball = start
+        var hits = 0
+        for (top in tops) {
+            val result = rallyStep(ball, top, far, step)
+            ball = result.ball
+            hits += result.sounds.count { it == SoundEvent.PADDLE }
+        }
+        return ball to hits
+    }
+
+    private fun eased(from: Double, to: Double, steps: Int): List<Double> {
+        var top = from
+        return List(steps) {
+            top += (to - top) * Match.EASE_ALPHA
+            if (kotlin.math.abs(to - top) <= Match.SNAP_DISTANCE) top = to
+            top
+        }
+    }
+
+    private val probe = Ball(86.0, 460.0, -Ball.SERVE_SPEED, 117.0)
+
+    @Test
+    fun `a paddle easing onto a ball it just struck hits it once`() {
+        for (detents in 1..6) {
+            val (ball, hits) = run(probe, eased(500.0, 500.0 - detents * Match.DETENT, 60))
+            assertEquals(1, hits, "$detents detents")
+            assertEquals(Ball.SERVE_SPEED * 1.06, ball.vx, 1e-9, "$detents detents")
+        }
+    }
+
+    @Test
+    fun `a paddle chasing the ball it just struck hits it once`() {
+        val (ball, hits) = run(probe, List(40) { 500.0 - 15.0 * (it + 1) })
+        assertEquals(1, hits)
+        assertEquals(Ball.SERVE_SPEED * 1.06, ball.vx, 1e-9)
+    }
+
+    @Test
+    fun `a paddle moving onto a ball leaving it only sets it in front of the face`() {
+        val leaving = Ball(70.0, 300.0, 620.0, -100.0)
+        val result = rallyStep(leaving, playerTop = 250.0, computerTop = far, seconds = step)
+        assertEquals(emptyList(), result.sounds)
+        assertEquals(leaving.vx, result.ball.vx)
+        assertEquals(leaving.vy, result.ball.vy)
+        assertTrue(result.ball.left >= Paddle.face(Side.PLAYER))
+    }
+
+    @Test
+    fun `a ball wedged between a wall and the cap of the paddle it left is not sped up`() {
+        var ball = Ball(80.0, 16.25, 782.9, 900.0)
+        repeat(10) {
+            val result = rallyStep(ball, playerTop = 32.5, computerTop = far, seconds = step)
+            assertTrue(SoundEvent.PADDLE !in result.sounds, "step $it: ${result.sounds}")
+            assertEquals(782.9, result.ball.vx)
+            assertTrue(result.ball.cx > ball.cx, "step $it: the ball moves on")
+            ball = result.ball
+        }
+    }
+
+    @Test
+    fun `a paddle parked against a wall cannot pin the ball`() {
+        val (ball, hits) = run(Ball(60.0, 17.0, -Ball.SERVE_SPEED, 0.0), List(20) { 32.0 })
+        assertEquals(1, hits)
+        assertTrue(ball.cx > 100, "ball at ${ball.cx}")
+    }
+
+    @Test
+    fun `a ball wholly past the face is not saved by a paddle moving onto it`() {
+        var ball = Ball(51.9, 444.6, -Ball.MAX_SPEED, 0.0)
+        repeat(20) {
+            val result = rallyStep(ball, playerTop = 344.0, computerTop = far, seconds = step)
+            assertTrue(SoundEvent.PADDLE !in result.sounds)
+            assertEquals(444.6, result.ball.cy)
+            assertEquals(-Ball.MAX_SPEED, result.ball.vx)
+            ball = result.ball
+            if (result.scorer != null) {
+                assertEquals(Side.COMPUTER, result.scorer)
+                return
+            }
+        }
+        error("the ball never reached the goal line")
+    }
+
+    @Test
+    fun `a ball wholly past the face glances off an end cap without a hit`() {
+        var ball = Ball(50.0, 290.0, -Ball.SERVE_SPEED, 900.0)
+        repeat(20) {
+            val result = rallyStep(ball, playerTop = 330.0, computerTop = far, seconds = step)
+            assertTrue(SoundEvent.PADDLE !in result.sounds)
+            assertEquals(-Ball.SERVE_SPEED, result.ball.vx)
+            assertTrue(result.ball.bottom <= 330.0 + 1e-9)
+            ball = result.ball
+            if (result.scorer != null) return
+        }
+        error("the ball never reached the goal line")
     }
 
     @Test

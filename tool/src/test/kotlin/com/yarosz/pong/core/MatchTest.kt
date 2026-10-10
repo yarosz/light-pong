@@ -27,7 +27,7 @@ class MatchTest {
     @Test
     fun `a match starts with both paddles centred and the player's serve pending`() {
         val match = newMatch()
-        assertEquals(Phase.PlayerServe(), match.phase)
+        assertEquals(Phase.PlayerServe, match.phase)
         assertEquals(Paddle.CENTRE_TOP, match.playerTop)
         assertEquals(Paddle.CENTRE_TOP, match.computerTop)
         assertEquals(488.0, Paddle.CENTRE_TOP)
@@ -52,14 +52,14 @@ class MatchTest {
     fun `the computer serves exactly 0_8 s after its serve state begins`() {
         val match = newMatch()
         match.toComputerServe()
-        assertEquals(Phase.ComputerServe(), match.phase)
+        assertEquals(Phase.ComputerServe, match.phase)
         match.steps(Match.COMPUTER_SERVE_STEPS - 1)
         assertIs<Phase.ComputerServe>(match.phase)
         assertEquals(Ball.AT_CENTRE, match.ball)
         match.step()
         assertEquals(Phase.Rally, match.phase)
         assertEquals(-Ball.SERVE_SPEED, match.ball.vx)
-        assertEquals(192, (0.8 * Match.STEPS_PER_SECOND).roundToLong().toInt())
+        assertEquals(192, (0.8 * STEPS_PER_SECOND).roundToLong().toInt())
     }
 
     @Test
@@ -87,10 +87,10 @@ class MatchTest {
         assertEquals(1, match.computerScore)
         assertNull(match.visibleBall)
         assertTrue(match.keepScreenOn)
-        match.steps(Match.HOLD_STEPS - 1)
+        match.steps(Match.PAUSE_STEPS - 1)
         assertIs<Phase.PointPause>(match.phase)
         match.step()
-        assertEquals(Phase.ComputerServe(), match.phase)
+        assertEquals(Phase.ComputerServe, match.phase)
         assertEquals(Ball.AT_CENTRE, match.visibleBall)
     }
 
@@ -109,7 +109,7 @@ class MatchTest {
         match.loseUntil { computerScore == Match.WINNING_SCORE }
         assertEquals(0, match.playerScore)
         assertIs<Phase.PointPause>(match.phase)
-        match.steps(Match.HOLD_STEPS - 1)
+        match.steps(Match.PAUSE_STEPS - 1)
         assertIs<Phase.PointPause>(match.phase)
         match.step()
         assertEquals(Phase.MatchOver(Side.COMPUTER), match.phase)
@@ -133,11 +133,11 @@ class MatchTest {
         assertFalse(match.keepScreenOn)
         val frozen = match.ball
         match.resume()
-        assertEquals(Phase.Hold(), match.phase)
+        assertEquals(Phase.Hold, match.phase)
         assertTrue(match.keepScreenOn)
         val computerBefore = match.computerTop
         match.turn(-3)
-        match.steps(Match.HOLD_STEPS - 1)
+        match.steps(Match.PAUSE_STEPS - 1)
         assertEquals(frozen, match.visibleBall)
         assertTrue(match.playerTop < Paddle.CENTRE_TOP)
         assertTrue(match.computerTop != computerBefore)
@@ -157,7 +157,7 @@ class MatchTest {
         match.click()
         assertTrue(match.paused)
         match.resume()
-        assertEquals(Phase.Hold(), match.phase)
+        assertEquals(Phase.Hold, match.phase)
     }
 
     @Test
@@ -166,7 +166,7 @@ class MatchTest {
         match.steps(Match.IDLE_PAUSE_STEPS - 10)
         match.pause()
         match.resume()
-        assertEquals(Phase.PlayerServe(), match.phase)
+        assertEquals(Phase.PlayerServe, match.phase)
         match.steps(Match.IDLE_PAUSE_STEPS - 1)
         assertFalse(match.paused)
         match.step()
@@ -181,7 +181,7 @@ class MatchTest {
         match.click()
         assertTrue(match.paused)
         match.resume()
-        assertEquals(Phase.ComputerServe(), match.phase)
+        assertEquals(Phase.ComputerServe, match.phase)
         match.steps(Match.COMPUTER_SERVE_STEPS - 1)
         assertIs<Phase.ComputerServe>(match.phase)
         match.step()
@@ -195,7 +195,7 @@ class MatchTest {
         match.steps(10)
         match.pause()
         match.resume()
-        assertEquals(Phase.ComputerServe(), match.phase)
+        assertEquals(Phase.ComputerServe, match.phase)
     }
 
     @Test
@@ -255,18 +255,18 @@ class MatchTest {
     fun `a frame longer than 50 ms runs only 12 steps`() {
         val match = newMatch()
         match.advance(nanos(1.0))
-        assertEquals(Phase.PlayerServe(12), match.phase)
+        assertEquals(12, match.phaseSteps)
         match.advance(nanos(0.05))
-        assertEquals(Phase.PlayerServe(24), match.phase)
+        assertEquals(24, match.phaseSteps)
     }
 
     @Test
     fun `frames carry their remainder so 60 Hz frames average 4 steps`() {
         val match = newMatch()
         repeat(60) { match.advance(nanos(1.0 / 60)) }
-        assertEquals(Phase.PlayerServe(240), match.phase)
+        assertEquals(240, match.phaseSteps)
         repeat(7) { match.advance(nanos(0.001)) }
-        assertEquals(Phase.PlayerServe(241), match.phase)
+        assertEquals(241, match.phaseSteps)
     }
 
     @Test
@@ -339,6 +339,38 @@ class MatchTest {
         assertEquals(emptyList(), match.advance(nanos(0.04)))
         assertEquals(emptyList(), match.step())
         assertEquals(frozen, match.snapshot())
+    }
+
+    @Test
+    fun `moves queued before a pause are dropped, not applied on resume`() {
+        val match = newMatch()
+        match.turn(2)
+        match.drag(30.0)
+        match.pause()
+        match.resume()
+        match.step()
+        assertEquals(Paddle.CENTRE_TOP, match.playerTarget)
+    }
+
+    @Test
+    fun `serves come from the serve stream whatever the difficulty`() {
+        val seed = 99L
+        val launches = Difficulty.entries.map { difficulty ->
+            val match = newMatch(seed, difficulty)
+            val launched = mutableListOf<Ball>()
+            match.stepUntil {
+                if (phase is Phase.PlayerServe) serve()
+                if (phase == Phase.Rally && ball.cx == Field.WIDTH / 2.0 && ball.cy == Field.HEIGHT / 2.0 && launched.lastOrNull() !== ball) launched += ball
+                launched.size >= 8
+            }
+            launched
+        }
+        val serveStream = Random(Random(seed).nextLong())
+        val expected = launches[0].map { Ball.served(if (it.vx > 0) Side.COMPUTER else Side.PLAYER, serveStream) }
+        assertTrue(launches[0].any { it.vx < 0 } && launches[0].any { it.vx > 0 }, "both sides served")
+        assertEquals(expected, launches[0])
+        assertEquals(launches[0], launches[1])
+        assertEquals(launches[0], launches[2])
     }
 
     @Test

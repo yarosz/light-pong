@@ -1,5 +1,9 @@
 package com.yarosz.pong.core
 
+/** The simulation runs in fixed Steps of 1/240 s. */
+const val STEPS_PER_SECOND = 240
+const val STEP_SECONDS = 1.0 / STEPS_PER_SECOND
+
 /** The playing field, in pixels: the LP3's app area at 480 dpi. y grows downward; the walls are y 0 and HEIGHT. */
 object Field {
     const val WIDTH = 1080

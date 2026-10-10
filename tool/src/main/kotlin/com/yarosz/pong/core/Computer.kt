@@ -43,7 +43,7 @@ class Computer internal constructor(val difficulty: Difficulty, private val rng:
     }
 
     private fun moveToward(goal: Double, speed: Double) {
-        val reach = speed / Match.STEPS_PER_SECOND
+        val reach = speed / STEPS_PER_SECOND
         val gap = goal - top
         top = if (abs(gap) <= reach) goal else top + gap.sign * reach
     }

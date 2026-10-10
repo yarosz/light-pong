@@ -1,7 +1,6 @@
 package com.yarosz.pong.core
 
 import kotlin.math.abs
-import kotlin.math.exp
 import kotlin.random.Random
 
 /**
@@ -20,7 +19,15 @@ class Match(val seed: Long, val difficulty: Difficulty) {
         computer = Computer(difficulty, Random(streams.nextLong()))
     }
 
-    var phase: Phase = Phase.PlayerServe()
+    /** Setting the Phase restarts [phaseSteps]. */
+    var phase: Phase = Phase.PlayerServe
+        private set(value) {
+            field = value
+            phaseSteps = 0
+        }
+
+    /** Whole Steps run in the current Phase; restarted by a Phase change, a resume, and paddle input on the player's serve. */
+    internal var phaseSteps = 0
         private set
     var paused = false
         private set
@@ -76,16 +83,16 @@ class Match(val seed: Long, val difficulty: Difficulty) {
         if (!inPlay) return
         paused = true
         frameUnits = 0
+        pendingMoves.clear()
     }
 
     fun resume() {
         if (!paused) return
         paused = false
         when (phase) {
-            is Phase.Rally, is Phase.Hold -> phase = Phase.Hold()
-            is Phase.PlayerServe -> phase = Phase.PlayerServe()
-            is Phase.ComputerServe -> phase = Phase.ComputerServe()
-            is Phase.PointPause -> afterPoint()
+            Phase.Rally, Phase.Hold -> phase = Phase.Hold
+            Phase.PlayerServe, Phase.ComputerServe -> phaseSteps = 0
+            Phase.PointPause -> afterPoint()
             is Phase.MatchOver -> Unit
         }
     }
@@ -110,16 +117,12 @@ class Match(val seed: Long, val difficulty: Difficulty) {
         applyPendingMoves()
         easePlayer()
         computer.step(ball.takeIf { phase is Phase.Rally || phase is Phase.Hold })
-        when (val current = phase) {
-            is Phase.PlayerServe ->
-                if (current.idleSteps + 1 >= IDLE_PAUSE_STEPS) pause() else phase = current.copy(idleSteps = current.idleSteps + 1)
-            is Phase.ComputerServe ->
-                if (current.steps + 1 >= COMPUTER_SERVE_STEPS) launch(toward = Side.PLAYER) else phase = current.copy(steps = current.steps + 1)
-            is Phase.Hold ->
-                phase = if (current.steps + 1 >= HOLD_STEPS) Phase.Rally else current.copy(steps = current.steps + 1)
-            is Phase.PointPause ->
-                if (current.steps + 1 >= HOLD_STEPS) afterPoint() else phase = current.copy(steps = current.steps + 1)
-            is Phase.Rally -> sounds += rally()
+        when (phase) {
+            Phase.PlayerServe -> if (++phaseSteps >= IDLE_PAUSE_STEPS) pause()
+            Phase.ComputerServe -> if (++phaseSteps >= COMPUTER_SERVE_STEPS) launch(toward = Side.PLAYER)
+            Phase.Hold -> if (++phaseSteps >= PAUSE_STEPS) phase = Phase.Rally
+            Phase.PointPause -> if (++phaseSteps >= PAUSE_STEPS) afterPoint()
+            Phase.Rally -> sounds += rally()
             is Phase.MatchOver -> Unit
         }
         return sounds
@@ -128,7 +131,7 @@ class Match(val seed: Long, val difficulty: Difficulty) {
     private fun applyPendingMoves() {
         if (pendingMoves.isEmpty()) return
         while (pendingMoves.isNotEmpty()) playerTarget = Paddle.clampTop(playerTarget + pendingMoves.removeFirst())
-        if (phase is Phase.PlayerServe) phase = Phase.PlayerServe()
+        if (phase == Phase.PlayerServe) phaseSteps = 0
     }
 
     private fun easePlayer() {
@@ -141,7 +144,7 @@ class Match(val seed: Long, val difficulty: Difficulty) {
         ball = result.ball
         val scorer = result.scorer ?: return result.sounds
         if (scorer == Side.PLAYER) playerScore++ else computerScore++
-        phase = Phase.PointPause()
+        phase = Phase.PointPause
         return result.sounds + SoundEvent.POINT
     }
 
@@ -150,8 +153,8 @@ class Match(val seed: Long, val difficulty: Difficulty) {
         phase = when {
             playerScore == WINNING_SCORE -> Phase.MatchOver(Side.PLAYER)
             computerScore == WINNING_SCORE -> Phase.MatchOver(Side.COMPUTER)
-            server == Side.PLAYER -> Phase.PlayerServe()
-            else -> Phase.ComputerServe()
+            server == Side.PLAYER -> Phase.PlayerServe
+            else -> Phase.ComputerServe
         }
     }
 
@@ -162,18 +165,17 @@ class Match(val seed: Long, val difficulty: Difficulty) {
 
     companion object {
         const val WINNING_SCORE = 11
-        const val STEPS_PER_SECOND = 240
-        const val STEP_SECONDS = 1.0 / STEPS_PER_SECOND
         const val NANOS_PER_SECOND = 1_000_000_000L
         const val MAX_FRAME_NANOS = 50_000_000L
 
         const val COMPUTER_SERVE_STEPS = 192
-        const val HOLD_STEPS = 144
+        /** The 0.6 s of both the Point pause and the Hold (C2). */
+        const val PAUSE_STEPS = 144
         const val IDLE_PAUSE_STEPS = 60 * STEPS_PER_SECOND
 
         const val DETENT = 40.0
         const val SNAP_DISTANCE = 0.5
         private const val EASE_TAU_SECONDS = 0.030
-        val EASE_ALPHA = 1 - exp(-STEP_SECONDS / EASE_TAU_SECONDS)
+        val EASE_ALPHA = 1 - StrictMath.exp(-STEP_SECONDS / EASE_TAU_SECONDS)
     }
 }

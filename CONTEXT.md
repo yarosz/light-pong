@@ -148,7 +148,8 @@ Point ends it. Each Approach re-rolls the Computer's Aim.
 _Avoid_: attack, incoming
 
 **Reaction delay**:
-How long the Computer waits into an Approach before steering for the Ball: 250, 150 or 80 ms.
+How long the Computer waits into an Approach before steering for the Ball: 250, 150 or 80 ms, run as
+60, 36 or 19 whole Steps (Hard's is 79 ms).
 _Avoid_: lag, latency
 
 **Intercept**:

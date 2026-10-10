@@ -3,7 +3,6 @@ package com.yarosz.pong.core
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.min
-import kotlin.math.tan
 import kotlin.random.Random
 
 /** The ball: its centre in field pixels and its velocity in px/s. */
@@ -19,7 +18,7 @@ data class Ball(val cx: Double, val cy: Double, val vx: Double, val vy: Double) 
         val speed = min(abs(vx) * SPEED_FACTOR, MAX_SPEED)
         val angle = MAX_BOUNCE * o.coerceIn(-1.0, 1.0)
         val direction = if (side == Side.PLAYER) 1.0 else -1.0
-        return copy(vx = direction * speed, vy = speed * tan(angle))
+        return copy(vx = direction * speed, vy = speed * StrictMath.tan(angle))
     }
 
     companion object {
@@ -38,7 +37,7 @@ data class Ball(val cx: Double, val cy: Double, val vx: Double, val vy: Double) 
             val angle = MIN_SERVE_ANGLE + (MAX_SERVE_ANGLE - MIN_SERVE_ANGLE) * rng.nextDouble()
             val sign = if (rng.nextBoolean()) 1.0 else -1.0
             val vx = if (toward == Side.COMPUTER) SERVE_SPEED else -SERVE_SPEED
-            return AT_CENTRE.copy(vx = vx, vy = sign * SERVE_SPEED * tan(angle))
+            return AT_CENTRE.copy(vx = vx, vy = sign * SERVE_SPEED * StrictMath.tan(angle))
         }
     }
 }

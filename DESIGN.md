@@ -79,7 +79,7 @@ vy flips at the walls. The ball can leave only across a goal line.
 
 #### 14. Scoring
 
-The point goes to the side whose goal was not crossed. On the crossing the ball disappears, the score updates and the point tone plays. A 0.6 s point pause follows, during which the player paddle moves, the computer drifts to centre, and clicks are consumed and ignored. Then the game enters the next serve state, or Match over at 11 (the winning point skips the serve).
+The point goes to the side whose goal was not crossed. The point is scored when the ball's leading edge reaches the goal line (D6). On the crossing the ball disappears, the score updates and the point tone plays. A 0.6 s point pause follows, during which the player paddle moves, the computer drifts to centre, and clicks are consumed and ignored. Then the game enters the next serve state, or Match over at 11 (the winning point skips the serve).
 
 ## Computer
 
@@ -96,6 +96,8 @@ Target = intercept + intended contact offset (uniform ±k·96 px) + aim error (u
 | Easy | 250 ms | 322 px/s | current ball y | 0.35 | 0.3 |
 | Normal | 150 ms | 468 px/s | predicted intercept, with wall bounces | 0.2 | 0.6 |
 | Hard | 80 ms | 614 px/s | predicted intercept | 0.08 | 0.85 |
+
+Reaction delays run in whole simulation steps, rounded to the nearest: 60, 36 and 19 steps, so Hard's 80 ms is 79 ms (D14).
 
 #### 17. Default difficulty
 
