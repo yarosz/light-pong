@@ -1,6 +1,6 @@
 # LightPhone3-pong AVD: recipe
 
-An LP3-shaped emulator for the Pong Tool on port 5560. It runs next to the other Tools' emulators (5554, 5556, 5558) without touching them.
+An LP3-shaped emulator for the Pong Tool on port 5560. It runs next to any other emulators on the machine without touching them.
 
 ## Why a fresh build and not a copy of the overlay
 
@@ -71,7 +71,7 @@ Expected: avd `LightPhone3-pong`, density 480, size 1080x1240, `app=1080x1168`, 
 
 ```bash
 adb -s emulator-5560 emu kill
-adb devices     # emulator-5554 still listed, unchanged
+adb devices     # any other emulators still listed, unchanged
 ```
 
 Helper scripts `wait-boot.sh`, `set-home.sh` and `verify.sh` are in this directory. They only ever call `adb -s emulator-5560`.

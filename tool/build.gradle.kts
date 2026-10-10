@@ -45,6 +45,10 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // The win-rate simulation runs only on request: ./gradlew :tool:testDebugUnitTest -Dpong.winrate=true
+        unitTests.all { test ->
+            providers.systemProperty("pong.winrate").orNull?.let { test.systemProperty("pong.winrate", it) }
+        }
     }
 
     compileOptions {
