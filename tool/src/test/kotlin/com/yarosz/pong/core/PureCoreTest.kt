@@ -5,13 +5,16 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** The core runs on the JVM alone: no Android, AndroidX or Light SDK import may reach it. */
+/** The core and the screen state run on the JVM alone: no Android, AndroidX or Light SDK import may reach them. */
 class PureCoreTest {
 
-    private val core = File("src/main/kotlin/com/yarosz/pong/core")
+    @Test
+    fun `no file under core imports android, androidx or the Light SDK`() = assertPure(File("src/main/kotlin/com/yarosz/pong/core"))
 
     @Test
-    fun `no file under core imports android, androidx or the Light SDK`() {
+    fun `no file under screen imports android, androidx or the Light SDK`() = assertPure(File("src/main/kotlin/com/yarosz/pong/screen"))
+
+    private fun assertPure(core: File) {
         val files = core.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
         assertTrue(files.isNotEmpty(), "no sources under $core")
         val platform = Regex("""^\s*import\s+(android|androidx|com\.thelightphone)\.""")
