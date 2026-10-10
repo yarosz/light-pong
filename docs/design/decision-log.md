@@ -41,7 +41,7 @@ resulting spec.
 ## Round B (controls, screens, lifecycle, copy; 2026-10-10)
 
 - B1 Vertical Paddles at the left and right edges; player left, beside the wheel.
-- B2 CCW 317 up, CW 318 down, one constant WHEEL_UP = 317, hand-tested on the LP3 and flipped if wrong.
+- B2 CCW 317 up, CW 318 down, one constant WHEEL_UP = 317, to be hand-tested on the LP3 and flipped if wrong.
 - B3 Detent = 1/24 of travel with 40 ms easing. SUPERSEDED by C1 (40 px, tau 30 ms); B's easing in the
   pure core, collision on the eased position and "none dropped" are kept.
 - B4 No acceleration. Kept; if too slow, raise the step (C1 names 48 px), never a curve.

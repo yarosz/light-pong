@@ -65,7 +65,7 @@ AI, bot, tick, ...) stay out of type names.
   `decideKey` in `screen/Keys.kt`, decides this for every screen (DESIGN.md item 22). A turn acts on
   every key-down; a click acts only on a key-down with repeat count 0.
 - **One constant knows the wheel's direction.** `WHEEL_UP` in `screen/Keys.kt` (317, counter-clockwise
-  moves up) is hand-tested on the LP3. Flip it there and nowhere else (ADR 0001).
+  moves up) is still to be hand-tested on the LP3 (`LEDGER.md` N2). Flip it there and nowhere else (ADR 0001).
 - **Nothing is written mid-match.** Only the Difficulty and sound choice persist, in `settings.txt`,
   written when they change (DESIGN.md item 31).
 
@@ -88,9 +88,9 @@ AI, bot, tick, ...) stay out of type names.
 
 - The Pong emulator is the AVD `LightPhone3-pong` on emulator-5560 (`scripts/emulator/RECIPE.md`).
   Scripts find it by AVD name through `scripts/pong-emu.sh` (override with `PONG_AVD`) and never fall
-  back to another emulator. Emulators on 5554, 5556 and 5558 belong to other Tools: never touch them.
+  back to another emulator. Never touch other emulators on the machine.
   Every raw adb call names its device with `-s`; never run `adb kill-server`.
-- The Light Phone III is shared between sessions through the lease in the umbrella `PLATFORM.md`.
+- When several sessions share one Light Phone III, take turns through a lease kept outside this repo (the lp3 plugin's `lp3-lease.sh`).
 
 ## How changes land
 

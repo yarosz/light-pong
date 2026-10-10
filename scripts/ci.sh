@@ -11,8 +11,8 @@
 #
 # The emulator is the one running AVD $PONG_AVD (default LightPhone3-pong, on emulator-5560), found
 # by name through scripts/pong-emu.sh. It never falls back to another emulator: other Tools run their
-# own emulators on this machine. The Light Phone III round trip (signoff/lp3) joins once the game takes
-# input, under the phone lease in the umbrella PLATFORM.md.
+# own emulators on this machine. The Light Phone III round trip (signoff/lp3) is not wired in yet
+# (LEDGER.md N6).
 #
 # Evidence is public (a PR comment). It carries generic facts only: commit, test counts, SDK ref,
 # round-trip lines. Never serials, hostnames, or local paths.
