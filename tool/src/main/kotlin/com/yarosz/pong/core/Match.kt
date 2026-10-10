@@ -9,7 +9,7 @@ import kotlin.random.Random
  * The renderer reads the public state each frame; it changes only through the input calls and [advance].
  * It draws the `drawn` positions, which blend the last two Steps and never feed back into the simulation.
  */
-class Match(val seed: Long, val difficulty: Difficulty) {
+class Match(val seed: Long, val difficulty: Difficulty, val sensitivity: Sensitivity = Sensitivity.DEFAULT) {
 
     private val serveRng: Random
     private val computer: Computer
@@ -48,6 +48,7 @@ class Match(val seed: Long, val difficulty: Difficulty) {
     val computerTop get() = computer.top
 
     private val pendingMoves = ArrayDeque<Double>()
+    private val detentRate = DetentRate()
 
     /** Elapsed time not yet run as Steps, in nanoseconds x [STEPS_PER_SECOND]; one Step is [NANOS_PER_SECOND]. */
     private var frameUnits = HALF_STEP_UNITS
@@ -79,9 +80,14 @@ class Match(val seed: Long, val difficulty: Difficulty) {
     val servePromptShown get() = !paused && phase is Phase.PlayerServe
     val server get() = if ((playerScore + computerScore) % 2 == 0) Side.PLAYER else Side.COMPUTER
 
-    /** Queues [detents] wheel detents for the next step: positive moves the paddle down. */
-    fun turn(detents: Int) {
-        if (inPlay) pendingMoves.addLast(detents * DETENT)
+    /**
+     * Queues one Detent for the next Step, [down] or up, moving the Paddle target by the [sensitivity]'s
+     * step for the Detent rate at [atMillis], the key's event time in uptime ms (DESIGN.md item 20).
+     */
+    fun turn(down: Boolean, atMillis: Long) {
+        if (!inPlay) return
+        val step = sensitivity.step(detentRate.detent(atMillis))
+        pendingMoves.addLast(if (down) step else -step)
     }
 
     /** Queues a touch drag of [dy] field pixels for the next step. */
@@ -227,7 +233,6 @@ class Match(val seed: Long, val difficulty: Difficulty) {
         const val PAUSE_STEPS = 144
         const val IDLE_PAUSE_STEPS = 60 * STEPS_PER_SECOND
 
-        const val DETENT = 40.0
         const val SNAP_DISTANCE = 0.5
         private const val EASE_TAU_SECONDS = 0.030
         val EASE_ALPHA = 1 - StrictMath.exp(-STEP_SECONDS / EASE_TAU_SECONDS)

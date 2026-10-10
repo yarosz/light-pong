@@ -38,3 +38,16 @@ taps on rows. Everything works by wheel alone.
   every Match between 30 and 15 Detents a second, so the wheel rate must be measured on the phone.
 - One input handler serves every screen, since key consumption is the same everywhere.
 - The direction constant is a deliberate single point of change for the hand test.
+
+## Amendment (2026-10-10, owner ruling after 0.1.0 on the LP3): acceleration and Sensitivity
+
+The owner played 0.1.0 on the phone and found the 40 px step "a little slow if I need to move
+quickly, but works generally". He chose a rate-based step with a capped ramp and a Sensitivity
+setting (decision log D31), which supersedes "There is no acceleration" above and the third
+considered option. A Detent now moves the Paddle target 40 px at 8 Detents a second or slower,
+rising linearly to 80 px at 25 a second, capped; the Detent rate comes from the keys' event times
+over the last 100 ms. Fast multiplies the curve by 1.5. A slow spin still moves exactly 40 px a
+Detent, so the precise end of the control feels as it did, and the cap keeps the fastest spin
+learnable. The core stays deterministic: the event times are inputs, so the same Seed and the same
+timed calls replay the same Match. Each spin logs one `spin` line, so the curve can be tuned against
+real hands.

@@ -13,13 +13,14 @@ enum class KeyAction { DOWN, UP, MULTIPLE }
 
 /**
  * A key as one of LightActivity's three hooks reports it. [down], [up] and [multiple] take the hook's
- * arguments: the event's repeat count for onKeyDown and onKeyUp, onKeyMultiple's own count.
+ * arguments: the event's repeat count for onKeyDown and onKeyUp, onKeyMultiple's own count. [atMillis]
+ * is the event's time (`KeyEvent.eventTime`, uptime ms), which times a Detent (DESIGN.md item 20).
  */
-data class KeyPress(val keyCode: Int, val action: KeyAction, val repeatCount: Int) {
+data class KeyPress(val keyCode: Int, val action: KeyAction, val repeatCount: Int, val atMillis: Long) {
     companion object {
-        fun down(keyCode: Int, eventRepeatCount: Int) = KeyPress(keyCode, KeyAction.DOWN, eventRepeatCount)
-        fun up(keyCode: Int, eventRepeatCount: Int) = KeyPress(keyCode, KeyAction.UP, eventRepeatCount)
-        fun multiple(keyCode: Int, repeatCount: Int) = KeyPress(keyCode, KeyAction.MULTIPLE, repeatCount)
+        fun down(keyCode: Int, eventRepeatCount: Int, atMillis: Long) = KeyPress(keyCode, KeyAction.DOWN, eventRepeatCount, atMillis)
+        fun up(keyCode: Int, eventRepeatCount: Int, atMillis: Long) = KeyPress(keyCode, KeyAction.UP, eventRepeatCount, atMillis)
+        fun multiple(keyCode: Int, repeatCount: Int, atMillis: Long) = KeyPress(keyCode, KeyAction.MULTIPLE, repeatCount, atMillis)
     }
 }
 

@@ -117,7 +117,7 @@ class MatchTest {
         assertFalse(match.keepScreenOn)
         val frozen = match.snapshot()
         assertEquals(emptyList(), match.advance(nanos(1.0)))
-        match.turn(3)
+        match.turnSlowly(3)
         match.click()
         match.pause()
         assertEquals(frozen, match.snapshot())
@@ -136,7 +136,7 @@ class MatchTest {
         assertEquals(Phase.Hold, match.phase)
         assertTrue(match.keepScreenOn)
         val computerBefore = match.computerTop
-        match.turn(-3)
+        match.turnSlowly(-3)
         match.steps(Match.PAUSE_STEPS - 1)
         assertEquals(frozen, match.visibleBall)
         assertTrue(match.playerTop < Paddle.CENTRE_TOP)
@@ -242,7 +242,7 @@ class MatchTest {
     fun `any paddle input restarts the idle timer`() {
         val match = newMatch()
         match.steps(Match.IDLE_PAUSE_STEPS - 1)
-        match.turn(1)
+        match.turnSlowly(1)
         match.steps(Match.IDLE_PAUSE_STEPS - 1)
         match.drag(-5.0)
         match.steps(Match.IDLE_PAUSE_STEPS - 1)
@@ -272,7 +272,7 @@ class MatchTest {
     @Test
     fun `a detent moves the target 40 px and the paddle eases there and snaps`() {
         val match = newMatch()
-        match.turn(1)
+        match.turnSlowly(1)
         assertEquals(Paddle.CENTRE_TOP, match.playerTarget)
         match.step()
         assertEquals(Paddle.CENTRE_TOP + 40, match.playerTarget)
@@ -291,14 +291,14 @@ class MatchTest {
     @Test
     fun `detents past an end are discarded`() {
         val match = newMatch()
-        match.turn(-1)
-        repeat(30) { match.turn(-1) }
+        match.turnSlowly(-1)
+        repeat(30) { match.turnSlowly(-1) }
         match.step()
         assertEquals(0.0, match.playerTarget)
-        match.turn(1)
+        match.turnSlowly(1)
         match.step()
         assertEquals(40.0, match.playerTarget)
-        repeat(40) { match.turn(1) }
+        repeat(40) { match.turnSlowly(1) }
         match.step()
         assertEquals(Paddle.MAX_TOP, match.playerTarget)
     }
@@ -306,9 +306,9 @@ class MatchTest {
     @Test
     fun `queued detents apply in order at the next step, none dropped`() {
         val match = newMatch()
-        match.turn(-1)
-        match.turn(-1)
-        match.turn(1)
+        match.turnSlowly(-1)
+        match.turnSlowly(-1)
+        match.turnSlowly(1)
         assertEquals(Paddle.CENTRE_TOP, match.playerTarget)
         match.step()
         assertEquals(Paddle.CENTRE_TOP - 40, match.playerTarget)
@@ -333,7 +333,7 @@ class MatchTest {
         match.steps(20)
         match.pause()
         val frozen = match.snapshot()
-        match.turn(5)
+        match.turnSlowly(5)
         match.drag(50.0)
         match.serve()
         assertEquals(emptyList(), match.advance(nanos(0.04)))
@@ -344,7 +344,7 @@ class MatchTest {
     @Test
     fun `moves queued before a pause are dropped, not applied on resume`() {
         val match = newMatch()
-        match.turn(2)
+        match.turnSlowly(2)
         match.drag(30.0)
         match.pause()
         match.resume()

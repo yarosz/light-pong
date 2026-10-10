@@ -44,7 +44,8 @@ resulting spec.
 - B2 CCW 317 up, CW 318 down, one constant WHEEL_UP = 317, to be hand-tested on the LP3 and flipped if wrong.
 - B3 Detent = 1/24 of travel with 40 ms easing. SUPERSEDED by C1 (40 px, tau 30 ms); B's easing in the
   pure core, collision on the eased position and "none dropped" are kept.
-- B4 No acceleration. Kept; if too slow, raise the step (C1 names 48 px), never a curve.
+- B4 No acceleration. SUPERSEDED by D31 (the owner's ruling after playing 0.1.0): a rate-based step with a
+  capped ramp and a Sensitivity setting.
 - B5 Click on key-down with repeatCount 0 only; the in-match rows of the click table. Kept, extended by
   C10 (Point pause ignores clicks) and C2 (a click in the Hold pauses).
 - B6 Title layout, rows, marker, hints and no About screen. Kept; C4 sizes the marker (32 px square).
@@ -75,7 +76,8 @@ resulting spec.
 ## Round C (contradictions; 2026-10-10)
 
 - C1 Each Detent moves the Paddle target 40 px, clamped to [0, 976], extra Detents discarded; the
-  Paddle eases at 240 Hz with tau 30 ms and snaps within 0.5 px; collision on the eased position.
+  Paddle eases at 240 Hz with tau 30 ms and snaps within 0.5 px; collision on the eased position. The
+  fixed 40 px is SUPERSEDED by D31 (40 px is now the step of a slow spin); the rest is kept.
 - C2 One 0.6 s constant for the Point pause and the Hold; during the Hold the Ball is frozen and visible,
   both Paddles move, and a click pauses again.
 - C3 The Computer serves 0.8 s after its serve state begins.
@@ -150,7 +152,8 @@ resulting spec.
   since a new tone cuts off the playing one.
 - D20 The end-of-Match Phase is named `MatchOver` to match the glossary term Match over.
 - D21 `turn(n)` queues one move of n × 40 px, clamped once. The Tool sends one call per key-down, so a
-  multi-Detent call appears only in tests.
+  multi-Detent call appears only in tests. SUPERSEDED by D31: `turn(down, atMillis)` queues one
+  Detent, since each Detent's step depends on its own time.
 - D22 Balance finding, not a change. Over 200 seeded Matches per Difficulty
   (`WinRateSimulationTest`), a bot playing perfectly at 30 Detents a second never loses a Point. One
   that reacts 0.2 s late and misjudges by up to 48 px still wins every Match (Hard scores 0.73 a
@@ -209,3 +212,32 @@ resulting spec.
   Point's return to the centre snaps instead of sweeping. The `benchmark` build type (release with
   `BuildConfig.BENCHMARK_RALLY`) opens straight into an endless Rally at the cap for 30 s, and
   `mise run bench <serial>` reports its PongPerf keys (`AGENTS.md`).
+
+## Build decisions (S5, wheel acceleration; 2026-10-10)
+
+- D31 Source: the owner, after playing 0.1.0 on the LP3: "40 px step is a little slow if I need to move
+  quickly, but works generally." Asked "linear or exponential, and should we allow adjusting
+  sensitivity", he accepted a rate-based step with a capped ramp and a Sensitivity setting. This
+  supersedes B4 and C1's fixed 40 px. Each Detent moves the Paddle target by step(rate) × the
+  Sensitivity's factor. The rate is read at each Detent from the keys' event times
+  (`KeyEvent.eventTime`, uptime ms) over the Detents of the last 100 ms, this one included: n Detents
+  spanning t ms read (n − 1)/t, so a steady spin reads its own rate and a lone Detent reads 0 (Detents
+  in one ms count 1 ms apart; an earlier event time restarts the window). The step is 40 px at 8 a
+  second or less, rising linearly to 80 px at 25, capped; no exponential. Fast multiplies the curve by
+  1.5 (60 to 120 px); Normal is the default. `Match.turn(down, atMillis)` takes one Detent and its
+  time, so the core stays deterministic: the same Seed and the same timed calls replay the same Match.
+  A spin of 8 a second or slower moves exactly 40 px a Detent, as 0.1.0 did. The Sensitivity persists
+  as a `sensitivity=normal|fast` line in `settings.txt`; a file without it (0.1.0's) reads as Normal,
+  and a bad value reads the whole file as the defaults, as before. Title gains the row "Wheel normal" /
+  "Wheel fast" under the sound row; to fit six rows in the app area the row pitch drops from 56 to
+  48 dp (Title and the panels alike, still the 48 dp touch minimum) and the gaps after "Pong" and
+  before the sound row from 24 to 16 dp, with the rows centred above the hint. During play each spin
+  (Detents with no gap of 150 ms) logs `spin detents=<n> ms=<first to last> peak_rate=<Detents/s,
+  rounded>` when it ends, or when play stops mid-spin, for tuning against real hands (D22). The
+  golden replay is re-recorded: its bot spins at 30 a second, which now earns 80 px a Detent. The test
+  bot turns while the gap exceeds half the step its own rate earns, so a fast spin cannot overshoot
+  back and forth. Balance finding, re-measured with `-Dpong.winrate=true` (200 Matches a
+  Difficulty): the faster Paddle makes every Difficulty easier for the simulated player. The late,
+  misjudging bot at 30 a second still wins nearly every Match (Hard 195/200, conceding 4.48 a Match),
+  and at 15 a second, now 56.5 px a Detent, it beats Hard 200/200 where it won 1/200 before (D22).
+  The Difficulty table (N3) is to be tuned from the `spin` lines of real play.

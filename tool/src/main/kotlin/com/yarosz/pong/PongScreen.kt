@@ -1,5 +1,6 @@
 package com.yarosz.pong
 
+import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -93,7 +94,10 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
 
     fun frame(intervalNanos: Long) {
         if (BuildConfig.BENCHMARK_RALLY) benchmarkFrame(intervalNanos)
-        update { advance(intervalNanos)?.let { tones?.play(it) } }
+        update {
+            advance(intervalNanos)?.let { tones?.play(it) }
+            wheelQuiet(SystemClock.uptimeMillis())
+        }
         val current = match
         if (shell.mode == Mode.PLAY && current?.phase == Phase.Rally) {
             frameLog.record(intervalNanos, current.frameSteps, drawNanos, abs(current.ball.vx))?.let { Log.d(PERF_TAG, it) }
@@ -120,11 +124,11 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
         return consumed
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent) = key(KeyPress.down(keyCode, event.repeatCount))
+    override fun onKeyDown(keyCode: Int, event: KeyEvent) = key(KeyPress.down(keyCode, event.repeatCount, event.eventTime))
 
-    override fun onKeyUp(keyCode: Int, event: KeyEvent) = key(KeyPress.up(keyCode, event.repeatCount))
+    override fun onKeyUp(keyCode: Int, event: KeyEvent) = key(KeyPress.up(keyCode, event.repeatCount, event.eventTime))
 
-    override fun onKeyMultiple(keyCode: Int, repeatCount: Int, event: KeyEvent) = key(KeyPress.multiple(keyCode, repeatCount))
+    override fun onKeyMultiple(keyCode: Int, repeatCount: Int, event: KeyEvent) = key(KeyPress.multiple(keyCode, repeatCount, event.eventTime))
 
     override fun onAppPause() = update { pause() }
 

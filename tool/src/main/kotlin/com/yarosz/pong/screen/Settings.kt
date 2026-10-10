@@ -1,19 +1,25 @@
 package com.yarosz.pong.screen
 
 import com.yarosz.pong.core.Difficulty
+import com.yarosz.pong.core.Sensitivity
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 
-/** The two choices that outlive a process (DESIGN.md items 17-18). */
-data class Settings(val difficulty: Difficulty = Difficulty.DEFAULT, val soundOn: Boolean = true) {
+/** The three choices that outlive a process (DESIGN.md items 17, 18 and 20). */
+data class Settings(
+    val difficulty: Difficulty = Difficulty.DEFAULT,
+    val soundOn: Boolean = true,
+    val sensitivity: Sensitivity = Sensitivity.DEFAULT,
+) {
 
-    fun encode() = "difficulty=${difficulty.name.lowercase()}\nsound=${if (soundOn) "on" else "off"}\n"
+    fun encode() = "difficulty=${difficulty.name.lowercase()}\nsound=${if (soundOn) "on" else "off"}\nsensitivity=${sensitivity.name.lowercase()}\n"
 
     companion object {
         /**
-         * Reads the `difficulty` and `sound` lines [encode] writes, in any order, ignoring blank and
-         * unknown lines. Null when either is missing or holds a value [encode] never writes.
+         * Reads the `difficulty`, `sound` and `sensitivity` lines [encode] writes, in any order, ignoring
+         * blank and unknown lines. A file without `sensitivity` (0.1.0 wrote none) reads as Normal. Null
+         * when `difficulty` or `sound` is missing, or any of the three holds a value [encode] never writes.
          */
         fun decode(text: String): Settings? {
             val fields = text.lines().filter { it.isNotBlank() }.associate { it.substringBefore('=') to it.substringAfter('=', "") }
@@ -23,7 +29,9 @@ data class Settings(val difficulty: Difficulty = Difficulty.DEFAULT, val soundOn
                 "off" -> false
                 else -> return null
             }
-            return Settings(difficulty, soundOn)
+            val sensitivity = fields["sensitivity"]?.let { value -> Sensitivity.entries.firstOrNull { it.name.lowercase() == value } ?: return null }
+                ?: Sensitivity.DEFAULT
+            return Settings(difficulty, soundOn, sensitivity)
         }
     }
 }

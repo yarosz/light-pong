@@ -5,8 +5,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * One recorded Match. Any change to the physics, the Computer, the serves or the easing moves this
- * state; when the change is intended, re-record the expected value from the failure message.
+ * One recorded Match. Any change to the physics, the Computer, the serves, the easing or the wheel's
+ * step moves this state; when the change is intended, re-record the expected value from the failure
+ * message. Re-recorded for D31: the bot spins at 30 Detents a second, which now earns 80 px a Detent.
  */
 class GoldenReplayTest {
 
@@ -31,12 +32,12 @@ class GoldenReplayTest {
             phase = Phase.Rally,
             phaseSteps = 0,
             paused = false,
-            playerScore = 4,
+            playerScore = 6,
             computerScore = 1,
-            ball = Ball(959.8067928529548, 867.4153372579815, 879.6237015099458, 424.8177370384114),
-            playerTarget = 471.0,
-            playerTop = 480.05776970951786,
-            computerTop = 817.3789582853769,
+            ball = Ball(388.79172150000636, 776.0477841309232, 696.74436, -46.14866588898475),
+            playerTarget = 490.31991744066045,
+            playerTop = 499.37831276288847,
+            computerTop = 612.3786996209869,
         )
     }
 }

@@ -23,7 +23,8 @@ class MatchPropertiesTest {
     private val eps = 1e-6
 
     /**
-     * Random wheel, drag, click, serve, pause and resume calls; two thirds of the scripts also play like
+     * Random wheel, drag, click, serve, pause and resume calls, the wheel's Detents timed by the Steps
+     * taken (several in one Step make a fast spin); two thirds of the scripts also play like
      * a bot. Every fourth script is extreme: it drags the paddle onto the ball every step, even after
      * hitting it, and turns, drags and pauses in bigger bursts.
      */
@@ -34,16 +35,21 @@ class MatchPropertiesTest {
         private val wheel = if (extreme) 13 else 4
         private val dragReach = if (extreme) 400.0 else 60.0
         private var pausedFor = 0
+        private var steps = 0L
 
         fun act(match: Match) {
+            steps++
+            bot?.act(match)
             if (match.paused) {
                 if (--pausedFor <= 0) match.resume()
                 return
             }
-            bot?.act(match)
             if (extreme) match.visibleBall?.let { match.drag(it.cy - Paddle.HALF_LENGTH - match.playerTarget) }
             when (rng.nextInt(1000)) {
-                in 0..79 -> match.turn(rng.nextInt(-wheel + 1, wheel))
+                in 0..79 -> {
+                    val detents = rng.nextInt(-wheel + 1, wheel)
+                    repeat(abs(detents)) { match.turn(down = detents > 0, atMillis = stepMillis(steps)) }
+                }
                 in 80..99 -> match.drag(rng.nextDouble(-dragReach, dragReach))
                 in 100..102 -> match.click()
                 in 103..112 -> match.serve()

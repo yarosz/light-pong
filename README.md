@@ -4,13 +4,13 @@ Pong for the Light Phone III. You play against the computer, and you move your p
 with the scroll wheel. The paddle sits on the left, beside the wheel. There is no account, no
 network and nothing to set up.
 
-> **Status: 0.1.0, the first release. Not yet in Light's Tool Library.** A Light Phone III Tool
+> **Status: 0.1.1. Not yet in Light's Tool Library.** A Light Phone III Tool
 > built on [Light's SDK](https://github.com/lightphone/light-sdk).
 
 Questions or bugs: https://github.com/yarosz/light-pong/issues
 
 <p>
-  <img src="docs/screenshots/title.png" width="32%" alt="The title screen: Pong above the rows Easy, Normal and Hard, a square marker beside the selected row, and the sound row below">
+  <img src="docs/screenshots/title.png" width="32%" alt="The title screen: Pong above the rows Easy, Normal and Hard, a square marker beside the selected row, and the sound and wheel rows below">
   <img src="docs/screenshots/rally.png" width="32%" alt="A rally: the score at the top, the dashed centre line, the two paddles at the edges and the ball between them">
   <img src="docs/screenshots/paused.png" width="32%" alt="A paused match: the frozen field behind a panel with Paused, the difficulty, and the rows Resume and Menu">
 </p>
@@ -21,8 +21,8 @@ _The title screen, a rally and a paused match. Taken on a Light Phone III._
 
 - **Choose a difficulty.** Pong opens on the title screen. Turn the wheel to choose Easy, Normal or
   Hard, and press it to start a match. Normal is the default, and Pong remembers your last choice.
-- **Move your paddle.** Turn the wheel. Each step of the wheel moves your paddle the same distance,
-  however fast you turn.
+- **Move your paddle.** Turn the wheel. A slow turn moves your paddle a short, even step each click;
+  spin faster and each click goes further, up to twice as far.
 - **Serve.** Press the wheel. You serve first, then the serve alternates every point. The computer
   serves on its own after a short wait.
 - **Pause.** Press the wheel during play. The pause panel offers Resume and Menu. Leaving Pong pauses
@@ -31,8 +31,10 @@ _The title screen, a rally and a paused match. Taken on a Light Phone III._
 - **Win.** The first side to 11 points wins, with no win by two. Then choose Play again or Menu.
 - **Touch works too.** Drag anywhere to move your paddle, tap to serve, and tap the two bars at the
   top of the field to pause. Tap a row to choose it. Everything also works by wheel alone.
-- **Sound.** The last row on the title screen turns sound on or off. Pong remembers this too. There
+- **Sound.** The sound row on the title screen turns sound on or off. Pong remembers this too. There
   are three short tones (a paddle hit, a wall bounce and a point) and no vibration.
+- **Wheel.** The last row on the title screen sets the wheel to normal or fast. Fast moves your paddle
+  half as far again for every click. Pong remembers this too.
 
 Back closes Pong. If you come back while the phone still has Pong in memory, your match is waiting,
 paused.
@@ -91,7 +93,7 @@ hundreds of seeded matches and check the rules after every step.
 ## Privacy
 
 Pong collects nothing. It declares no permissions and never uses the network. It stores one small
-file, `settings.txt`, with your difficulty and whether sound is on. The full statement is
+file, `settings.txt`, with your difficulty, whether sound is on and the wheel setting. The full statement is
 `docs/privacy.md`; see also `SECURITY.md`.
 
 ## Licence

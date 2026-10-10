@@ -11,12 +11,23 @@ _Avoid_: app
 
 **Detent**:
 One click of the LP3's scroll wheel as it turns: one 317 or 318 key-down, whatever its repeat count.
-In a Match it moves the Paddle target 40 px; in a menu it moves the selection one row.
+In a Match it moves the Paddle target 40 to 80 px by the Detent rate, times the Sensitivity; in a
+menu it moves the selection one row.
 _Avoid_: tick, notch, scroll step
 
+**Detent rate**:
+How fast the wheel is turning, in Detents a second, read at each Detent over the Detents of the last
+100 ms. A lone Detent reads 0.
+_Avoid_: speed, velocity (the Ball has a speed)
+
+**Sensitivity**:
+The player's choice of how far a Detent moves the Paddle target: Normal (40 to 80 px) or Fast (1.5
+times that). Set on Title and kept in settings.txt.
+_Avoid_: acceleration, wheel speed
+
 **Title**:
-The screen a Tool launch opens on: the Difficulty rows and the sound row. A Match starts from it and
-"Menu" returns to it.
+The screen a Tool launch opens on: the Difficulty rows, the sound row and the wheel row (the
+Sensitivity). A Match starts from it and "Menu" returns to it.
 _Avoid_: home, start screen, main menu
 
 ## Play

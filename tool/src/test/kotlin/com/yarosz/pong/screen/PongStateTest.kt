@@ -4,6 +4,7 @@ import com.yarosz.pong.core.Difficulty
 import com.yarosz.pong.core.Match
 import com.yarosz.pong.core.Paddle
 import com.yarosz.pong.core.Phase
+import com.yarosz.pong.core.Sensitivity
 import com.yarosz.pong.core.Side
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,7 +29,82 @@ class PongStateTest {
         repeat(5) { state.command(Command.UP) }
         assertEquals(TitleRow.EASY, state.titleRow)
         repeat(9) { state.command(Command.DOWN) }
-        assertEquals(TitleRow.SOUND, state.titleRow)
+        assertEquals(TitleRow.WHEEL, state.titleRow)
+    }
+
+    @Test
+    fun `clicking the wheel row toggles the Sensitivity and starts nothing`() {
+        val state = newState()
+        repeat(4) { state.command(Command.DOWN) }
+        assertEquals(TitleRow.WHEEL, state.titleRow)
+        state.command(Command.CLICK)
+        assertEquals(Settings(Difficulty.NORMAL, soundOn = true, Sensitivity.FAST), state.settings)
+        assertEquals(Mode.TITLE, state.mode)
+        state.tapTitle(TitleRow.WHEEL)
+        assertEquals(Sensitivity.NORMAL, state.settings.sensitivity)
+    }
+
+    @Test
+    fun `a match plays at the Sensitivity chosen on Title`() {
+        val state = newState(Settings(sensitivity = Sensitivity.FAST))
+        state.tapTitle(TitleRow.NORMAL)
+        assertEquals(Sensitivity.FAST, state.match?.sensitivity)
+        val start = state.match!!.playerTarget
+        state.key(KeyPress.down(WHEEL_DOWN, 0, atMillis = 1_000))
+        state.advance(STEP_NANOS)
+        assertEquals(start + 60, state.match!!.playerTarget)
+    }
+
+    @Test
+    fun `the title labels and hint name each row's choice`() {
+        val normal = Settings()
+        val fast = Settings(soundOn = false, sensitivity = Sensitivity.FAST)
+        assertEquals("Wheel normal", TitleRow.WHEEL.label(normal))
+        assertEquals("Wheel fast", TitleRow.WHEEL.label(fast))
+        assertEquals("Sound on", TitleRow.SOUND.label(normal))
+        assertEquals("Sound off", TitleRow.SOUND.label(fast))
+        assertEquals("Easy", TitleRow.EASY.label(normal))
+        for (row in listOf(TitleRow.EASY, TitleRow.NORMAL, TitleRow.HARD)) {
+            assertEquals("Turn the wheel to choose. Press it to start.", row.hint(normal))
+        }
+        assertEquals("Press the wheel to turn sound off.", TitleRow.SOUND.hint(normal))
+        assertEquals("Press the wheel to turn sound on.", TitleRow.SOUND.hint(fast))
+        assertEquals("Press the wheel to make it fast.", TitleRow.WHEEL.hint(normal))
+        assertEquals("Press the wheel to make it normal.", TitleRow.WHEEL.hint(fast))
+    }
+
+    @Test
+    fun `a spin in play is logged once the wheel has been quiet for 150 ms`() {
+        val state = stateIn(Mode.PLAY)
+        state.drainLog()
+        for (at in listOf(1_000L, 1_040L, 1_080L)) state.key(KeyPress.down(WHEEL_DOWN, 0, at))
+        state.wheelQuiet(1_229)
+        assertEquals(emptyList(), state.drainLog())
+        state.wheelQuiet(1_230)
+        assertEquals(listOf("spin detents=3 ms=80 peak_rate=25"), state.drainLog())
+    }
+
+    @Test
+    fun `a spin cut short by a pause is logged before the pause`() {
+        val state = stateIn(Mode.PLAY)
+        state.drainLog()
+        state.key(KeyPress.down(WHEEL_UP, 0, 500))
+        state.command(Command.CLICK)
+        state.command(Command.CLICK)
+        assertEquals(listOf("state=play rally", "spin detents=1 ms=0 peak_rate=0", "state=paused"), state.drainLog())
+    }
+
+    @Test
+    fun `turning the wheel on Title or a panel logs no spin`() {
+        val state = newState()
+        state.key(KeyPress.down(WHEEL_DOWN, 0, 0))
+        state.wheelQuiet(1_000)
+        val paused = stateIn(Mode.PAUSED)
+        paused.drainLog()
+        paused.key(KeyPress.down(WHEEL_DOWN, 0, 0))
+        paused.wheelQuiet(1_000)
+        assertEquals(listOf("state=title"), state.drainLog())
+        assertEquals(emptyList(), paused.drainLog())
     }
 
     @Test
@@ -67,13 +143,13 @@ class PongStateTest {
     fun `in play the wheel moves the paddle, up is up`() {
         val state = stateIn(Mode.PLAY)
         val start = state.match!!.playerTarget
-        state.command(Command.UP)
+        state.command(Command.UP, atMillis = 0)
         state.advance(STEP_NANOS)
-        assertEquals(start - Match.DETENT, state.match!!.playerTarget)
-        state.command(Command.DOWN)
-        state.command(Command.DOWN)
+        assertEquals(start - 40, state.match!!.playerTarget)
+        state.command(Command.DOWN, atMillis = 1_000)
+        state.command(Command.DOWN, atMillis = 2_000)
         state.advance(STEP_NANOS)
-        assertEquals(start + Match.DETENT, state.match!!.playerTarget)
+        assertEquals(start + 40, state.match!!.playerTarget)
     }
 
     @Test

@@ -29,26 +29,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yarosz.pong.core.Difficulty
 import com.yarosz.pong.core.Side
 import com.yarosz.pong.screen.MenuRow
 import com.yarosz.pong.screen.Mode
 import com.yarosz.pong.screen.Shell
 import com.yarosz.pong.screen.TitleRow
+import com.yarosz.pong.screen.label
 
 private val GUTTER = 16.dp
-private val ROW_PITCH = 56.dp
+private val ROW_PITCH = 48.dp
+/** The gaps after "Pong" and before the settings rows. */
+private val TITLE_GAP = 16.dp
 /** Wide enough that the Paddles (x 48-72 and 1008-1032 px) show beside the panel. */
 private val PANEL_INSET = 32.dp
 private const val MARKER_PX = 32f
 private const val MARKER_GAP_PX = 24f
 private const val PANEL_BORDER_PX = 4f
-
-private fun Difficulty.label() = when (this) {
-    Difficulty.EASY -> "Easy"
-    Difficulty.NORMAL -> "Normal"
-    Difficulty.HARD -> "Hard"
-}
 
 /** [LineBreak.Heading] balances a wrapped label's lines, so a hint that wraps leaves no orphan word. */
 @Composable
@@ -72,26 +68,21 @@ private fun MenuItem(label: String, selected: Boolean, onTap: () -> Unit) {
     }
 }
 
+/** The rows centre in the space above the hint, so the hint never overlaps them (DESIGN.md items 25 and 30). */
 @Composable
 fun Title(shell: Shell, onTap: (TitleRow) -> Unit) {
-    val sound = if (shell.settings.soundOn) "Sound on" else "Sound off"
-    val hint = when {
-        shell.titleRow != TitleRow.SOUND -> "Turn the wheel to choose. Press it to start."
-        shell.settings.soundOn -> "Press the wheel to turn sound off."
-        else -> "Press the wheel to turn sound on."
-    }
-    Box(Modifier.fillMaxSize().padding(horizontal = GUTTER)) {
-        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-            Label("Pong", 48.sp)
-            Spacer(Modifier.height(24.dp))
-            Column {
-                for (row in TitleRow.entries) {
-                    if (row == TitleRow.SOUND) Spacer(Modifier.height(24.dp))
-                    MenuItem(row.difficulty?.label() ?: sound, shell.titleRow == row) { onTap(row) }
-                }
+    Column(Modifier.fillMaxSize().padding(horizontal = GUTTER), horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.weight(1f))
+        Label("Pong", 48.sp)
+        Spacer(Modifier.height(TITLE_GAP))
+        Column {
+            for (row in TitleRow.entries) {
+                if (row == TitleRow.SOUND) Spacer(Modifier.height(TITLE_GAP))
+                MenuItem(row.label(shell.settings), shell.titleRow == row) { onTap(row) }
             }
         }
-        Label(hint, 16.sp, Modifier.align(Alignment.BottomCenter).padding(bottom = GUTTER))
+        Spacer(Modifier.weight(1f))
+        Label(shell.titleRow.hint(shell.settings), 16.sp, Modifier.padding(bottom = GUTTER))
     }
 }
 
