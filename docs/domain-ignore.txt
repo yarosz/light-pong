@@ -5,8 +5,47 @@
 PongScreen
 PongViewModel
 
+# The screen state around the Match (screen/PongState.kt, screen/PongOwner.kt). PongState and PongOwner
+# are named after the Tool, like PongScreen; "state" there is the screen's, not a Phase. Mode is which
+# screen shows (Title, play, Paused, Match over), a level above the Phases, and Shell is its snapshot
+# for recomposition. TitleRow and MenuRow are the rows of the Title and of the Paused and Match over
+# panels.
+PongState
+PongOwner
+Mode
+Shell
+TitleRow
+MenuRow
+
+# The wheel's keys (screen/Keys.kt, DESIGN.md items 19-22): one of LightActivity's three key hooks, the
+# Command a key gives, and whether the hook consumes it.
+KeyPress
+KeyAction
+KeyDecision
+Command
+
+# Drawing (DESIGN.md items 1-7). FieldLayout places what is drawn in Field px, Letterbox scales the
+# Field into the canvas and centres it, and FrameLog batches frame intervals for measurement. A frame
+# is one redraw, not a Step.
+FieldLayout
+Letterbox
+FrameLog
+
+# The two choices that outlive a process, Difficulty and sound, and settings.txt in filesDir (items 17,
+# 18, 31).
+Settings
+SettingsFile
+
+# The audio played for Sound events (DESIGN.md item 18). CONTEXT.md's Sound event entry names a tone as
+# the audio played for an event, so Tones is the right word here.
+Tones
+
+# UI copy. "You win" addresses the Player, as DESIGN.md's copy list does. "else" is not copy: the
+# script reads `"on" else "off"` in Settings.encode as one string.
+You win
+else
+
 # The swept collision in core/Rally.kt: a Contact is the first touch of the Ball on a Wall or Paddle
 # within a Step, and a Reach is a Paddle grown by half the Ball, the region the Ball's centre touches it.
 Contact
 Reach
-KeyPress
