@@ -7,9 +7,9 @@ import kotlin.test.assertEquals
 
 /**
  * A sanity check on the difficulty table, printed rather than asserted. The perfect player is limited
- * only by speed, 30 detents a second (1200 px/s). The human-like players also react 0.2 s late and
- * misjudge the intercept by up to a quarter of a paddle; the slow one turns 15 detents a second.
- * It plays 1,800 Matches, so it runs only with -Dpong.winrate=true.
+ * only by speed, 30 detents a second (66.7 px each by D31, 2,000 px/s). The human-like players also
+ * react 0.2 s late and misjudge the intercept by up to a quarter of a paddle; the slow one turns 15
+ * detents a second (46.7 px each, 700 px/s). It plays 1,800 Matches, so it runs only with -Dpong.winrate=true.
  */
 class WinRateSimulationTest {
 
@@ -49,7 +49,7 @@ class WinRateSimulationTest {
         val human = winRates("human-like, 30 detents/s, 0.2 s late, misjudges up to 48 px") {
             PlayerBot(Random(it), reactionSteps = 48, misjudgement = Paddle.LENGTH / 4)
         }
-        val slow = winRates("human-like at 15 detents/s (600 px/s)") {
+        val slow = winRates("human-like at 15 detents/s (700 px/s)") {
             PlayerBot(Random(it), detentsPerSecond = 15, reactionSteps = 48, misjudgement = Paddle.LENGTH / 4)
         }
         println("$perfect\n$human\n$slow")

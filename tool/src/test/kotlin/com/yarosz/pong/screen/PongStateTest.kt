@@ -1,10 +1,13 @@
 package com.yarosz.pong.screen
 
+import com.yarosz.pong.core.Ball
 import com.yarosz.pong.core.Difficulty
 import com.yarosz.pong.core.Match
 import com.yarosz.pong.core.Paddle
 import com.yarosz.pong.core.Phase
+import com.yarosz.pong.core.Sensitivity
 import com.yarosz.pong.core.Side
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -25,17 +28,131 @@ class PongStateTest {
     @Test
     fun `title selection clamps at both ends`() {
         val state = newState()
-        repeat(5) { state.command(Command.UP) }
+        repeat(5) { state.wheel(Command.UP) }
         assertEquals(TitleRow.EASY, state.titleRow)
-        repeat(9) { state.command(Command.DOWN) }
-        assertEquals(TitleRow.SOUND, state.titleRow)
+        repeat(9) { state.wheel(Command.DOWN) }
+        assertEquals(TitleRow.WHEEL, state.titleRow)
+    }
+
+    @Test
+    fun `clicking the wheel row toggles the Sensitivity and starts nothing`() {
+        val state = newState()
+        repeat(4) { state.wheel(Command.DOWN) }
+        assertEquals(TitleRow.WHEEL, state.titleRow)
+        state.wheel(Command.CLICK)
+        assertEquals(Settings(Difficulty.NORMAL, soundOn = true, Sensitivity.FAST), state.settings)
+        assertEquals(Mode.TITLE, state.mode)
+        state.tapTitle(TitleRow.WHEEL)
+        assertEquals(Sensitivity.NORMAL, state.settings.sensitivity)
+    }
+
+    @Test
+    fun `a match plays at the Sensitivity chosen on Title`() {
+        val state = newState(Settings(sensitivity = Sensitivity.FAST))
+        state.tapTitle(TitleRow.NORMAL)
+        assertEquals(Sensitivity.FAST, state.match?.sensitivity)
+        assertTrue("match seed=42 difficulty=normal sensitivity=fast" in state.drainLog())
+        val start = state.match!!.playerTarget
+        state.key(KeyPress.down(WHEEL_DOWN, 0, atMillis = 1_000))
+        state.advance(STEP_NANOS)
+        assertEquals(start + 60, state.match!!.playerTarget)
+    }
+
+    @Test
+    fun `the title labels and hint name each row's choice`() {
+        val normal = Settings()
+        val fast = Settings(soundOn = false, sensitivity = Sensitivity.FAST)
+        assertEquals("Wheel normal", TitleRow.WHEEL.label(normal))
+        assertEquals("Wheel fast", TitleRow.WHEEL.label(fast))
+        assertEquals("Sound on", TitleRow.SOUND.label(normal))
+        assertEquals("Sound off", TitleRow.SOUND.label(fast))
+        assertEquals("Easy", TitleRow.EASY.label(normal))
+        for (row in listOf(TitleRow.EASY, TitleRow.NORMAL, TitleRow.HARD)) {
+            assertEquals("Turn the wheel to choose. Press it to start.", row.hint(normal))
+        }
+        assertEquals("Press the wheel to turn sound off.", TitleRow.SOUND.hint(normal))
+        assertEquals("Press the wheel to turn sound on.", TitleRow.SOUND.hint(fast))
+        assertEquals("Press the wheel to make it fast.", TitleRow.WHEEL.hint(normal))
+        assertEquals("Press the wheel to make it normal.", TitleRow.WHEEL.hint(fast))
+    }
+
+    @Test
+    fun `a spin in play is logged once the wheel has been quiet for 150 ms`() {
+        val state = stateIn(Mode.PLAY)
+        state.drainLog()
+        for (at in listOf(1_000L, 1_040L, 1_080L)) state.key(KeyPress.down(WHEEL_DOWN, 0, at))
+        state.wheelQuiet(1_229)
+        assertEquals(emptyList(), state.drainLog())
+        state.wheelQuiet(1_230)
+        assertEquals(listOf("spin detents=3 ms=80 peak_rate=25"), state.drainLog())
+    }
+
+    @Test
+    fun `the logged peak rate is the rate the Match applied, also in the Match after Menu`() {
+        val state = stateIn(Mode.PLAY)
+        for (at in listOf(1_000L, 1_030L, 1_045L)) state.key(KeyPress.down(WHEEL_DOWN, 0, at))
+        state.pause()
+        state.wheel(Command.DOWN)
+        state.wheel(Command.CLICK)
+        state.tapTitle(TitleRow.NORMAL)
+        assertTrue("spin detents=3 ms=45 peak_rate=44" in state.drainLog())
+        val start = state.match!!.playerTarget
+        for (at in listOf(1_060L, 1_100L)) state.key(KeyPress.down(WHEEL_DOWN, 0, at))
+        state.advance(STEP_NANOS)
+        assertEquals(start + 40 + 60, state.match!!.playerTarget, "the new Match reads 1,060 as lone and 1,100 as 25 a second")
+        state.pause()
+        assertTrue("spin detents=2 ms=40 peak_rate=25" in state.drainLog())
+    }
+
+    @Test
+    fun `the benchmark Rally holds the speed cap, then pauses once and stays done`() {
+        val state = newState()
+        state.startBenchmarkRally()
+        var finished = 0
+        repeat((PongState.BENCHMARK_NANOS / FRAME_NANOS).toInt() + 10) {
+            if (state.benchmarkFrame(FRAME_NANOS)) finished++
+            state.advance(FRAME_NANOS)
+            if (state.mode == Mode.PLAY) assertEquals(Ball.MAX_SPEED, abs(state.match!!.ball.vx))
+        }
+        assertEquals(1, finished)
+        assertEquals(Mode.PAUSED, state.mode)
+        assertEquals(0, state.match!!.playerScore + state.match!!.computerScore)
+        state.wheel(Command.CLICK)
+        repeat(100) {
+            assertFalse(state.benchmarkFrame(FRAME_NANOS))
+            state.advance(FRAME_NANOS)
+        }
+        assertEquals(Mode.PLAY, state.mode)
+    }
+
+    @Test
+    fun `a spin cut short by a pause is logged before the pause`() {
+        val state = stateIn(Mode.PLAY)
+        state.drainLog()
+        state.key(KeyPress.down(WHEEL_UP, 0, 500))
+        state.wheel(Command.CLICK)
+        state.wheel(Command.CLICK)
+        assertEquals(listOf("state=play rally", "spin detents=1 ms=0 peak_rate=0", "state=paused"), state.drainLog())
+    }
+
+    @Test
+    fun `turning the wheel on Title or a panel logs no spin`() {
+        val state = newState()
+        state.key(KeyPress.down(WHEEL_DOWN, 0, 0))
+        state.wheelQuiet(1_000)
+        val paused = stateIn(Mode.PAUSED)
+        paused.drainLog()
+        paused.key(KeyPress.down(WHEEL_DOWN, 0, 0))
+        paused.wheelQuiet(1_000)
+        assertEquals(listOf("state=title"), state.drainLog())
+        assertEquals(emptyList(), paused.drainLog())
     }
 
     @Test
     fun `clicking the sound row toggles sound and starts nothing`() {
         val state = newState()
-        repeat(2) { state.command(Command.DOWN) }
-        state.command(Command.CLICK)
+        repeat(2) { state.wheel(Command.DOWN) }
+        state.wheel(Command.CLICK)
         assertEquals(Settings(Difficulty.NORMAL, soundOn = false), state.settings)
         assertEquals(Mode.TITLE, state.mode)
         state.tapTitle(TitleRow.SOUND)
@@ -45,8 +162,8 @@ class PongStateTest {
     @Test
     fun `clicking a difficulty starts a match there and remembers it`() {
         val state = newState()
-        state.command(Command.UP)
-        state.command(Command.CLICK)
+        state.wheel(Command.UP)
+        state.wheel(Command.CLICK)
         assertEquals(Mode.PLAY, state.mode)
         assertEquals(Difficulty.EASY, state.match?.difficulty)
         assertEquals(Difficulty.EASY, state.settings.difficulty)
@@ -67,22 +184,22 @@ class PongStateTest {
     fun `in play the wheel moves the paddle, up is up`() {
         val state = stateIn(Mode.PLAY)
         val start = state.match!!.playerTarget
-        state.command(Command.UP)
+        state.command(Command.UP, atMillis = 0)
         state.advance(STEP_NANOS)
-        assertEquals(start - Match.DETENT, state.match!!.playerTarget)
-        state.command(Command.DOWN)
-        state.command(Command.DOWN)
+        assertEquals(start - 40, state.match!!.playerTarget)
+        state.command(Command.DOWN, atMillis = 1_000)
+        state.command(Command.DOWN, atMillis = 2_000)
         state.advance(STEP_NANOS)
-        assertEquals(start + Match.DETENT, state.match!!.playerTarget)
+        assertEquals(start + 40, state.match!!.playerTarget)
     }
 
     @Test
     fun `click serves, then pauses the rally with Resume preselected`() {
         val state = stateIn(Mode.PLAY)
-        state.command(Command.CLICK)
+        state.wheel(Command.CLICK)
         assertEquals(Phase.Rally, state.match?.phase)
         state.advance(FRAME_NANOS)
-        state.command(Command.CLICK)
+        state.wheel(Command.CLICK)
         assertEquals(Mode.PAUSED, state.mode)
         assertEquals(MenuRow.FIRST, state.menuRow)
         assertFalse(state.shell.awake)
@@ -91,10 +208,10 @@ class PongStateTest {
     @Test
     fun `resume from a rally goes through the hold`() {
         val state = stateIn(Mode.PLAY)
-        state.command(Command.CLICK)
+        state.wheel(Command.CLICK)
         state.advance(FRAME_NANOS)
-        state.command(Command.CLICK)
-        state.command(Command.CLICK)
+        state.wheel(Command.CLICK)
+        state.wheel(Command.CLICK)
         assertEquals(Mode.PLAY, state.mode)
         assertEquals(Phase.Hold, state.match?.phase)
     }
@@ -102,11 +219,11 @@ class PongStateTest {
     @Test
     fun `menu selection clamps and Resume is preselected on every pause`() {
         val state = stateIn(Mode.PAUSED)
-        repeat(3) { state.command(Command.DOWN) }
+        repeat(3) { state.wheel(Command.DOWN) }
         assertEquals(MenuRow.MENU, state.menuRow)
-        repeat(3) { state.command(Command.UP) }
+        repeat(3) { state.wheel(Command.UP) }
         assertEquals(MenuRow.FIRST, state.menuRow)
-        state.command(Command.DOWN)
+        state.wheel(Command.DOWN)
         state.tapMenu(MenuRow.FIRST)
         assertEquals(Mode.PLAY, state.mode)
         state.pause()
@@ -118,8 +235,8 @@ class PongStateTest {
         val state = newState()
         state.tapTitle(TitleRow.HARD)
         state.pause()
-        state.command(Command.DOWN)
-        state.command(Command.CLICK)
+        state.wheel(Command.DOWN)
+        state.wheel(Command.CLICK)
         assertEquals(Mode.TITLE, state.mode)
         assertNull(state.match)
         assertEquals(TitleRow.HARD, state.titleRow)
@@ -140,10 +257,10 @@ class PongStateTest {
     fun `Play again starts a fresh match at the same difficulty`() {
         var seed = 0L
         val state = PongState(Settings(Difficulty.EASY)) { ++seed }
-        state.command(Command.CLICK)
+        state.wheel(Command.CLICK)
         state.playUntil { mode == Mode.OVER }
         val over = state.match
-        state.command(Command.CLICK)
+        state.wheel(Command.CLICK)
         assertNotSame(over, state.match)
         assertEquals(2L, state.match?.seed)
         assertEquals(Difficulty.EASY, state.match?.difficulty)
@@ -193,7 +310,7 @@ class PongStateTest {
     @Test
     fun `leaving the screen while Paused selects Resume again`() {
         val state = stateIn(Mode.PAUSED)
-        state.command(Command.DOWN)
+        state.wheel(Command.DOWN)
         state.pause()
         assertEquals(Mode.PAUSED, state.mode)
         assertEquals(MenuRow.FIRST, state.menuRow)
@@ -202,7 +319,7 @@ class PongStateTest {
     @Test
     fun `the panel keeps its selection between inputs`() {
         val state = stateIn(Mode.PAUSED)
-        state.command(Command.DOWN)
+        state.wheel(Command.DOWN)
         state.advance(FRAME_NANOS)
         state.tapField(540.0, 88.0)
         assertEquals(MenuRow.MENU, state.menuRow)
@@ -213,7 +330,7 @@ class PongStateTest {
         assertFalse(newState().shell.awake)
         val state = stateIn(Mode.PLAY)
         assertTrue(state.shell.awake)
-        state.command(Command.CLICK)
+        state.wheel(Command.CLICK)
         state.advance(FRAME_NANOS)
         assertTrue(state.shell.awake)
         state.pause()
@@ -225,7 +342,7 @@ class PongStateTest {
     fun `a frame plays only the last of its sounds`() {
         val state = stateIn(Mode.PLAY)
         val twin = Match(42, Difficulty.NORMAL)
-        state.command(Command.CLICK)
+        state.wheel(Command.CLICK)
         twin.click()
         var several = 0
         var frames = 0
@@ -237,7 +354,7 @@ class PongStateTest {
             assertEquals(sounds.lastOrNull(), state.advance(Match.MAX_FRAME_NANOS))
             if (sounds.size > 1) several++
             if (twin.phase is Phase.PlayerServe) {
-                state.command(Command.CLICK)
+                state.wheel(Command.CLICK)
                 twin.click()
             }
         }
@@ -247,11 +364,11 @@ class PongStateTest {
     @Test
     fun `a frame plays no sound with sound off`() {
         val state = newState(Settings(soundOn = false))
-        state.command(Command.CLICK)
-        state.command(Command.CLICK)
+        state.wheel(Command.CLICK)
+        state.wheel(Command.CLICK)
         repeat(60 * 30) {
             assertNull(state.advance(FRAME_NANOS))
-            if (state.match?.phase is Phase.PlayerServe) state.command(Command.CLICK)
+            if (state.match?.phase is Phase.PlayerServe) state.wheel(Command.CLICK)
         }
         assertTrue(state.match!!.playerScore + state.match!!.computerScore > 0)
     }
@@ -259,12 +376,12 @@ class PongStateTest {
     @Test
     fun `pausing leaves Title and Match over as they are`() {
         val title = newState()
-        title.command(Command.DOWN)
+        title.wheel(Command.DOWN)
         title.pause()
         assertEquals(Mode.TITLE, title.mode)
         assertEquals(TitleRow.HARD, title.titleRow)
         val over = stateIn(Mode.OVER)
-        over.command(Command.DOWN)
+        over.wheel(Command.DOWN)
         over.pause()
         assertEquals(Mode.OVER, over.mode)
         assertEquals(MenuRow.MENU, over.menuRow)
@@ -281,20 +398,20 @@ class PongStateTest {
     @Test
     fun `the event log names state changes, points and paddle hits`() {
         val state = newState(seed = 7)
-        state.command(Command.CLICK)
-        state.command(Command.CLICK)
+        state.wheel(Command.CLICK)
+        state.wheel(Command.CLICK)
         state.playUntil { match!!.playerScore + match!!.computerScore == 2 }
         state.pause()
         val log = state.drainLog()
         assertEquals("state=title", log[0])
-        assertEquals("match seed=7 difficulty=normal", log[1])
+        assertEquals("match seed=7 difficulty=normal sensitivity=normal", log[1])
         assertEquals("state=play serve=player", log[2])
         assertEquals("state=play rally", log[3])
         val points = log.filter { it.startsWith("point=") }
         assertEquals(2, points.size)
         assertTrue(points[0].endsWith("score=0-1") || points[0].endsWith("score=1-0"), points[0])
         assertTrue("state=play serve=computer" in log, log.toString())
-        assertTrue(log.all { it.matches(Regex("""state=\w+( \S+)?|match seed=\d+ difficulty=\w+|point=(player|computer) score=\d+-\d+|hit=paddle side=(player|computer)""")) }, log.toString())
+        assertTrue(log.all { it.matches(Regex("""state=\w+( \S+)?|match seed=\d+ difficulty=\w+ sensitivity=(normal|fast)|point=(player|computer) score=\d+-\d+|hit=paddle side=(player|computer)""")) }, log.toString())
         assertEquals("state=paused", log.last())
         assertTrue(state.drainLog().isEmpty())
     }
@@ -304,7 +421,7 @@ class PongStateTest {
         val state = stateIn(Mode.PLAY)
         val hits = mutableListOf<String>()
         while (state.mode != Mode.OVER) {
-            if (state.match?.phase is Phase.PlayerServe) state.command(Command.CLICK) else state.advance(FRAME_NANOS)
+            if (state.match?.phase is Phase.PlayerServe) state.wheel(Command.CLICK) else state.advance(FRAME_NANOS)
             val side = if (state.match!!.ball.cx < 540) "player" else "computer"
             state.drainLog().filter { it.startsWith("hit=") }.forEach {
                 assertEquals("hit=paddle side=$side", it)

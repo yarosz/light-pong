@@ -1,7 +1,6 @@
 package com.yarosz.pong.core
 
 import kotlin.math.abs
-import kotlin.math.sign
 import kotlin.random.Random
 
 /** Everything a renderer can read from a Match, as one comparable value. */
@@ -31,10 +30,23 @@ fun Match.stepUntil(limit: Int = 200_000, done: Match.() -> Boolean) {
 
 const val PLAYER_CONTACT_X = Paddle.PLAYER_LEFT + Paddle.THICKNESS + Ball.HALF
 
+private var slowWheelMillis = 0L
+
+/** Turns [detents] Detents (positive is down) a second apart, so each moves the Paddle target 40 px, as every Detent did in 0.1.0. */
+fun Match.turnSlowly(detents: Int) = repeat(abs(detents)) {
+    slowWheelMillis += 1_000
+    turn(down = detents > 0, atMillis = slowWheelMillis)
+}
+
+/** The event time of a Detent sent before Step [steps], in uptime ms. */
+fun stepMillis(steps: Long) = steps * 1_000 / STEPS_PER_SECOND
+
 /**
- * A player who turns the wheel at most [detentsPerSecond] times a second. A perfect bot steers toward
- * the ball's predicted intercept plus a chosen contact offset; a losing bot steers away from it. Each
- * approach, the bot waits [reactionSteps] and misjudges the intercept by up to [misjudgement] px.
+ * A player who turns the wheel at most [detentsPerSecond] times a second, timing each Detent by the
+ * Steps it has seen. A perfect bot steers toward the ball's predicted intercept plus a chosen contact
+ * offset; a losing bot steers away from it. Each approach, the bot waits [reactionSteps] and misjudges
+ * the intercept by up to [misjudgement] px. It turns while the gap is more than half the step its
+ * spin rate earns, so a fast spin never overshoots back and forth.
  */
 class PlayerBot(
     private val rng: Random,
@@ -45,6 +57,8 @@ class PlayerBot(
     private val misjudgement: Double = 0.0,
 ) {
     private val stepsPerDetent = STEPS_PER_SECOND / detentsPerSecond
+    private val halfStep = Sensitivity.NORMAL.step(detentsPerSecond.toDouble()) / 2
+    private var steps = 0L
     private var cooldown = 0
     private var aim = 0.0
     private var approaching = false
@@ -52,6 +66,7 @@ class PlayerBot(
     private var waitedToServe = 0
 
     fun act(match: Match) {
+        steps++
         if (match.paused || match.phase is Phase.MatchOver) return
         if (match.phase is Phase.PlayerServe && ++waitedToServe >= serveDelaySteps) {
             waitedToServe = 0
@@ -63,8 +78,8 @@ class PlayerBot(
             return
         }
         val gap = goal - match.playerTarget
-        if (abs(gap) >= Match.DETENT / 2) {
-            match.turn(gap.sign.toInt())
+        if (abs(gap) > halfStep) {
+            match.turn(down = gap > 0, atMillis = stepMillis(steps))
             cooldown = stepsPerDetent - 1
         }
     }

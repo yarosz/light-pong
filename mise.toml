@@ -37,6 +37,13 @@ run = [
 description = "Local CI: tests, Light-builder simulation, emulator round trip on the Pong AVD; posts signoff statuses"
 run = "scripts/ci.sh"
 
+[tasks.bench]
+description = "Frame benchmark on a device: install the benchmark build (30 s Rally at the speed cap), print PongPerf P50/P90 (arg: adb serial)"
+usage = '''
+arg "<serial>" help="adb serial of the device (required)"
+'''
+run = 'scripts/bench.sh "$usage_serial"'
+
 [tasks.domain-drift]
 description = "List possible new domain terms since the last domain-pass/* tag (advisory)"
 run = "scripts/domain-drift.sh"

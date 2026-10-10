@@ -139,7 +139,7 @@ class RallyTest {
     @Test
     fun `a paddle easing onto a ball it just struck hits it once`() {
         for (detents in 1..6) {
-            val (ball, hits) = run(probe, eased(500.0, 500.0 - detents * Match.DETENT, 60))
+            val (ball, hits) = run(probe, eased(500.0, 500.0 - detents * Sensitivity.SLOW_STEP, 60))
             assertEquals(1, hits, "$detents detents")
             assertEquals(Ball.SERVE_SPEED * 1.06, ball.vx, 1e-9, "$detents detents")
         }

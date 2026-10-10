@@ -49,3 +49,8 @@ else
 # within a Step, and a Reach is a Paddle grown by half the Ball, the region the Ball's centre touches it.
 Contact
 Reach
+
+# Measurement (decision log D31): BurstLog collects the wheel's bursts, runs of Detents with no 150 ms
+# gap, into `spin` PongEvent lines for tuning the step curve, as FrameLog batches frames. A burst is a
+# spin of the wheel; the type avoids "spin", which CONTEXT.md keeps away from the Ball.
+BurstLog

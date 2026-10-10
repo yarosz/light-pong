@@ -1,5 +1,6 @@
 package com.yarosz.pong
 
+import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -52,6 +53,7 @@ import com.yarosz.pong.screen.Mode
 import com.yarosz.pong.screen.PongOwner
 import com.yarosz.pong.screen.PongState
 import com.yarosz.pong.screen.SettingsFile
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -71,8 +73,11 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
 
     private val frameLog = FrameLog()
 
+    /** How long the field's last draw took, measured around [drawField] on the main thread. */
+    var drawNanos = 0L
+
     init {
-        update {}
+        update { if (BuildConfig.BENCHMARK_RALLY && match == null) startBenchmarkRally() }
     }
 
     fun update(block: PongState.() -> Unit) {
@@ -86,9 +91,16 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
     }
 
     fun frame(intervalNanos: Long) {
-        update { advance(intervalNanos)?.let { tones?.play(it) } }
-        if (shell.mode == Mode.PLAY && match?.phase == Phase.Rally) {
-            frameLog.record(intervalNanos)?.let { Log.d(PERF_TAG, it) }
+        var benchmarkDone = false
+        update {
+            if (BuildConfig.BENCHMARK_RALLY) benchmarkDone = benchmarkFrame(intervalNanos)
+            advance(intervalNanos)?.let { tones?.play(it) }
+            wheelQuiet(SystemClock.uptimeMillis())
+        }
+        if (benchmarkDone) Log.d(PERF_TAG, "done")
+        val current = match
+        if (shell.mode == Mode.PLAY && current?.phase == Phase.Rally) {
+            frameLog.record(intervalNanos, current.frameSteps, drawNanos, abs(current.ball.vx))?.let { Log.d(PERF_TAG, it) }
         } else {
             frameLog.reset()
         }
@@ -100,11 +112,11 @@ class PongViewModel(private val state: PongState, private val settingsFile: Sett
         return consumed
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent) = key(KeyPress.down(keyCode, event.repeatCount))
+    override fun onKeyDown(keyCode: Int, event: KeyEvent) = key(KeyPress.down(keyCode, event.repeatCount, event.eventTime))
 
-    override fun onKeyUp(keyCode: Int, event: KeyEvent) = key(KeyPress.up(keyCode, event.repeatCount))
+    override fun onKeyUp(keyCode: Int, event: KeyEvent) = key(KeyPress.up(keyCode, event.repeatCount, event.eventTime))
 
-    override fun onKeyMultiple(keyCode: Int, repeatCount: Int, event: KeyEvent) = key(KeyPress.multiple(keyCode, repeatCount))
+    override fun onKeyMultiple(keyCode: Int, repeatCount: Int, event: KeyEvent) = key(KeyPress.multiple(keyCode, repeatCount, event.eventTime))
 
     override fun onAppPause() = update { pause() }
 
@@ -169,7 +181,9 @@ class PongScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, PongVi
         val touch = if (play) Modifier.pointerInput(Unit) { fieldGestures(vm) } else Modifier
         Canvas(Modifier.fillMaxSize().then(touch)) {
             vm.frame.intValue
+            val start = System.nanoTime()
             vm.match?.let { drawField(it, pauseBars = play) }
+            vm.drawNanos = System.nanoTime() - start
         }
         if (play) PauseControl { vm.update { tapField(FieldLayout.CENTRE_X.toDouble(), FieldLayout.PAUSE_TARGET_Y.toDouble()) } }
     }

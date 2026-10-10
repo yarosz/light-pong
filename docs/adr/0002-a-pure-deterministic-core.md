@@ -25,7 +25,7 @@ caught and re-recorded on purpose.
 The Ball's collisions are swept: each Step finds the earliest contact with a Wall or a Paddle in the
 time left and bounces there, so no speed can carry the Ball through a Paddle. The player's Paddle
 eases toward the Paddle target inside the core, with a 30 ms time constant and a snap within 0.5 px,
-and collisions use the eased position, which is also the drawn one.
+and collisions use the eased position. The renderer draws that position blended between the last two Steps, one Step (4.2 ms) behind the clock, so frames that run 3 or 5 Steps still draw even motion (decision log D30).
 
 ## Considered Options
 

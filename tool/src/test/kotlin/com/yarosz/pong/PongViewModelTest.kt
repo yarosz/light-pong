@@ -2,10 +2,12 @@ package com.yarosz.pong
 
 import android.view.KeyEvent
 import com.yarosz.pong.core.Phase
+import com.yarosz.pong.core.Sensitivity
 import com.yarosz.pong.screen.KEY_WHEEL_CLICK
 import com.yarosz.pong.screen.MenuRow
 import com.yarosz.pong.screen.Mode
 import com.yarosz.pong.screen.SettingsFile
+import com.yarosz.pong.screen.TitleRow
 import com.yarosz.pong.screen.stateIn
 import java.nio.file.Files
 import kotlin.test.Test
@@ -16,8 +18,19 @@ class PongViewModelTest {
 
     private val event = KeyEvent(KeyEvent.ACTION_DOWN, 0)
 
-    private fun viewModel(mode: Mode) =
-        PongViewModel(stateIn(mode), SettingsFile(Files.createTempDirectory("pong-vm").toFile().apply { deleteOnExit() }))
+    private val settingsFile = SettingsFile(Files.createTempDirectory("pong-vm").toFile().apply { deleteOnExit() })
+
+    private fun viewModel(mode: Mode) = PongViewModel(stateIn(mode), settingsFile)
+
+    @Test
+    fun `toggling the wheel row saves the Sensitivity at once`() {
+        val vm = viewModel(Mode.TITLE)
+        vm.update { tapTitle(TitleRow.WHEEL) }
+        assertEquals(Sensitivity.FAST, settingsFile.load().sensitivity)
+        assertEquals(Sensitivity.FAST, vm.shell.settings.sensitivity)
+        vm.update { tapTitle(TitleRow.WHEEL) }
+        assertEquals(Sensitivity.NORMAL, settingsFile.load().sensitivity)
+    }
 
     @Test
     fun `all three key hooks return true for the wheel and false for 24`() {

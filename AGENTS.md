@@ -39,16 +39,19 @@ AI, bot, tick, ...) stay out of type names.
 - `tool/`: the Tool. Code in `tool/src/main/kotlin/com/yarosz/pong/`, tests in `tool/src/test/`.
   - `core/`: the game (ADR 0002). `Match` runs fixed 240 Hz Steps from a Seed and the calls made to
     it; `Rally.kt` sweeps the Ball's collisions in one Step; `Computer` steers the Computer's Paddle;
-    `Field.kt` holds the geometry and `Difficulty` the table of DESIGN.md item 16. The core reports
+    `Field.kt` holds the geometry, `Difficulty` the table of DESIGN.md item 16, and `Wheel.kt` the
+    Detent rate and the Sensitivity's step curve (item 20). The core reports
     Sound events and never plays audio.
   - `screen/`: the screen's state, still plain Kotlin. `PongState` takes every input and holds the
     Title selection, the Match and the panel selection; `PongOwner` keeps the process's one
     `PongState` (ADR 0003); `Keys.kt` decides what each key does; `Settings.kt` reads and writes
-    `settings.txt`; `Tone.kt` generates the tones' samples.
+    `settings.txt`; `BurstLog.kt` makes the wheel's `spin` lines; `Tone.kt` generates the tones' samples.
   - The package root: the Android side. `PongScreen.kt` (the `LightScreen`, its view model and the
     `withFrameNanos` frame loop), `FieldRenderer.kt`, `Menus.kt` and `Tones.kt` (the `AudioTrack`s).
-- `scripts/`: `ci.sh`, `light-build.sh`, `emulator-build.sh`, `pong-emu.sh` and `domain-drift.sh`;
-  `scripts/emulator/` builds and checks the Pong AVD.
+- `scripts/`: `ci.sh`, `light-build.sh`, `emulator-build.sh`, `pong-emu.sh`, `domain-drift.sh`, and
+  `bench.sh` with `p90.py` and its check `bench-test.sh`, which runs against the fake adb in
+  `scripts/fake-adb/` (no device, no plugin; `ci.sh` runs it with the unit tests); `scripts/emulator/`
+  builds and checks the Pong AVD.
 - `mise.toml`, `.mise/tasks/ui`: toolchain and commands; run `mise tasks`.
 
 ## Rules this repo keeps
@@ -66,8 +69,8 @@ AI, bot, tick, ...) stay out of type names.
   every key-down; a click acts only on a key-down with repeat count 0.
 - **One constant knows the wheel's direction.** `WHEEL_UP` in `screen/Keys.kt` (317, counter-clockwise
   moves up) is still to be hand-tested on the LP3 (`LEDGER.md` N2). Flip it there and nowhere else (ADR 0001).
-- **Nothing is written mid-match.** Only the Difficulty and sound choice persist, in `settings.txt`,
-  written when they change (DESIGN.md item 31).
+- **Nothing is written mid-match.** Only the Difficulty, the sound choice and the Sensitivity persist,
+  in `settings.txt`, written when they change (DESIGN.md item 31).
 
 ## Platform rules (enforced by Light's build plugin)
 
@@ -91,6 +94,35 @@ AI, bot, tick, ...) stay out of type names.
   back to another emulator. Never touch other emulators on the machine.
   Every raw adb call names its device with `-s`; never run `adb kill-server`.
 - When several sessions share one Light Phone III, take turns through a lease kept outside this repo (the lp3 plugin's `lp3-lease.sh`).
+
+## Measuring frames and spins
+
+During a Rally every build logs one `PongPerf` line a second (debug level), 60 frames to a line, for
+`scripts/p90.py` (vendored from the lp3 plugin's lp3-measure). The key names are frozen; scripts parse them:
+
+- `frame_ms`: the frame's interval, to 0.1 ms.
+- `steps`: the Steps that frame ran (4 at 60 Hz; D30).
+- `draw_ms`: the field's last draw, timed around `drawField` on the main thread, to 0.01 ms. It is the
+  draw recorded into the display list, not the GPU's work.
+- `speed`: the Ball's |vx| in px/s, once a line, at its last frame.
+
+Each wheel spin during play logs one `PongEvent` line when it ends, after 150 ms with no Detent or when
+play stops mid-spin (DESIGN.md item 20, decision log D31), for tuning the step curve. Its key names are
+frozen too:
+
+- `spin detents`: the Detents in the spin.
+- `ms`: from its first Detent to its last, in event-time ms.
+- `peak_rate`: the fastest Detent rate the Match applied among them (the rate `Match.turn` returns), in
+  Detents a second, rounded.
+
+Each Match starts with one `PongEvent` line, `match seed=<n> difficulty=<easy|normal|hard>
+sensitivity=<normal|fast>`, so a `spin` line can be read against the curve it ran on. Its keys
+(`match seed`, `difficulty`, `sensitivity`) are frozen too.
+
+`mise run bench <serial>` builds the `benchmark` build type (release with `BuildConfig.BENCHMARK_RALLY`:
+not debuggable, dev-signed, same applicationId), installs it over the Tool, and opens straight into an
+endless Rally at the 1170 px/s cap for 30 s, then prints P50/P90 of each key and the frames by Steps.
+Reinstall the normal build afterwards. Only the LP3's numbers mean anything; hold the phone lease.
 
 ## How changes land
 

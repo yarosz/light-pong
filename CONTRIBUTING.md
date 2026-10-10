@@ -22,7 +22,8 @@ Light's build plugin enforces these, and Light builds every release from source:
 - Anything that needs a permission, the network, an account or tracking. Pong declares none and uses
   none.
 - Android imports in `core/` or `screen/`. The game stays pure and deterministic (ADR 0002).
-- Wheel acceleration. If the Paddle feels slow, the step per Detent grows instead (ADR 0001).
+- An exponential or uncapped wheel curve. The step rises linearly with the Detent rate and caps at
+  80 px (ADR 0001's amendment, decision log D31); tune it from the `spin` log lines.
 
 ## Pull requests
 

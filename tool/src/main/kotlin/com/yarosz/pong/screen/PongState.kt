@@ -1,24 +1,55 @@
 package com.yarosz.pong.screen
 
+import com.yarosz.pong.core.Ball
 import com.yarosz.pong.core.Difficulty
 import com.yarosz.pong.core.Match
+import com.yarosz.pong.core.Paddle
 import com.yarosz.pong.core.Phase
+import com.yarosz.pong.core.Sensitivity
 import com.yarosz.pong.core.Side
 import com.yarosz.pong.core.SoundEvent
+import kotlin.math.abs
 
 /** What the screen shows (DESIGN.md item 31): Play covers every in-match Phase that is not Paused. */
 enum class Mode { TITLE, PLAY, PAUSED, OVER }
 
+/** The Title's rows, top to bottom (DESIGN.md item 25): the Difficulties, then the sound and wheel settings. */
 enum class TitleRow(val difficulty: Difficulty?) {
     EASY(Difficulty.EASY),
     NORMAL(Difficulty.NORMAL),
     HARD(Difficulty.HARD),
     SOUND(null),
+    WHEEL(null),
     ;
+
+    fun label(settings: Settings): String = when (this) {
+        SOUND -> if (settings.soundOn) "Sound on" else "Sound off"
+        WHEEL -> when (settings.sensitivity) {
+            Sensitivity.NORMAL -> "Wheel normal"
+            Sensitivity.FAST -> "Wheel fast"
+        }
+        EASY, NORMAL, HARD -> checkNotNull(difficulty).label()
+    }
+
+    /** The hint at the bottom of Title while this row is selected. */
+    fun hint(settings: Settings): String = when (this) {
+        SOUND -> if (settings.soundOn) "Press the wheel to turn sound off." else "Press the wheel to turn sound on."
+        WHEEL -> when (settings.sensitivity) {
+            Sensitivity.NORMAL -> "Press the wheel to make it fast."
+            Sensitivity.FAST -> "Press the wheel to make it normal."
+        }
+        EASY, NORMAL, HARD -> "Turn the wheel to choose. Press it to start."
+    }
 
     companion object {
         fun of(difficulty: Difficulty) = entries.first { it.difficulty == difficulty }
     }
+}
+
+fun Difficulty.label() = when (this) {
+    Difficulty.EASY -> "Easy"
+    Difficulty.NORMAL -> "Normal"
+    Difficulty.HARD -> "Hard"
 }
 
 /** The two rows of the Paused and Match over panels: [FIRST] is Resume or Play again. */
@@ -39,7 +70,8 @@ data class Shell(
 /**
  * The Tool's whole screen state: the Title selection, the Match in progress and the panel selection.
  * Every input goes through here, so this is where the panel's preselection rule runs
- * ([preselectMenuRow]) and where the PongEvent log lines come from.
+ * ([preselectMenuRow]) and where the PongEvent log lines come from, the wheel's bursts among them
+ * ([BurstLog]).
  */
 class PongState(settings: Settings, private val newSeed: () -> Long) {
 
@@ -53,6 +85,10 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
         private set
 
     private val log = mutableListOf("state=title")
+    private val burst = BurstLog()
+
+    /** Frame time of the benchmark Rally so far; null outside it. */
+    private var benchmarkNanos: Long? = null
 
     val mode: Mode
         get() {
@@ -82,11 +118,12 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
     /** One key from any of the three hooks: returns whether it is consumed. */
     fun key(press: KeyPress): Boolean {
         val decision = decideKey(press)
-        decision.command?.let(::command)
+        decision.command?.let { command(it, press.atMillis) }
         return decision.consumed
     }
 
-    fun command(command: Command) = tracked {
+    /** One wheel [command]; [atMillis] is its key's event time, which only a turn in play reads. */
+    fun command(command: Command, atMillis: Long) = tracked {
         val current = match
         when (mode) {
             Mode.TITLE -> when (command) {
@@ -95,8 +132,10 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
                 Command.CLICK -> activate(titleRow)
             }
             Mode.PLAY -> when (command) {
-                Command.UP -> current?.turn(-1)
-                Command.DOWN -> current?.turn(1)
+                Command.UP, Command.DOWN -> {
+                    val rate = current?.turn(down = command == Command.DOWN, atMillis = atMillis)
+                    if (rate != null) burst.detent(atMillis, rate)?.let { log += it }
+                }
                 Command.CLICK -> current?.click()
             }
             Mode.PAUSED, Mode.OVER -> when (command) {
@@ -131,6 +170,11 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
         if (mode == Mode.PLAY) match?.drag(dy)
     }
 
+    /** Called each frame in play: logs the burst once the wheel is quiet for 150 ms at [nowMillis] (uptime ms). */
+    fun wheelQuiet(nowMillis: Long) {
+        if (mode == Mode.PLAY) burst.quiet(nowMillis)?.let { log += it }
+    }
+
     /** Runs the Match for one frame; returns the tone to play: the frame's last sound (decision log D19), none with sound off. */
     fun advance(frameNanos: Long): SoundEvent? {
         var sounds = emptyList<SoundEvent>()
@@ -144,13 +188,57 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
      */
     fun pause() = tracked(reshown = true) { match?.pause() }
 
+    /** The benchmark build only (decision log D30): opens straight into the endless Rally at the speed cap. */
+    fun startBenchmarkRally() = tracked {
+        startMatch(settings.difficulty)
+        benchmarkNanos = 0
+        holdBenchmarkRally()
+    }
+
+    /**
+     * The benchmark build only, once a frame before [advance]: keeps the Rally endless for
+     * [BENCHMARK_NANOS] of frames in play, then pauses. Returns true on the frame that ends the run,
+     * once; after it the Match plays as any other.
+     */
+    fun benchmarkFrame(intervalNanos: Long): Boolean {
+        var finished = false
+        tracked {
+            val elapsed = benchmarkNanos ?: return@tracked
+            if (mode != Mode.PLAY) return@tracked
+            if (elapsed + intervalNanos < BENCHMARK_NANOS) {
+                benchmarkNanos = elapsed + intervalNanos
+                holdBenchmarkRally()
+            } else {
+                benchmarkNanos = null
+                match?.pause()
+                finished = true
+            }
+        }
+        return finished
+    }
+
+    /** Serves a pending Serve, holds the Ball at the speed cap, and puts both Paddles on its line, so neither misses. */
+    private fun holdBenchmarkRally() {
+        val current = match ?: return
+        current.serve()
+        if (current.phase != Phase.Rally) return
+        val ball = current.ball
+        val factor = Ball.MAX_SPEED / abs(ball.vx)
+        val capped = ball.copy(vx = ball.vx * factor, vy = ball.vy * factor)
+        current.place(capped, Paddle.clampTop(capped.cy - Paddle.HALF_LENGTH))
+    }
+
     private fun activate(row: TitleRow) {
-        val difficulty = row.difficulty
-        if (difficulty == null) {
-            settings = settings.copy(soundOn = !settings.soundOn)
-        } else {
-            settings = settings.copy(difficulty = difficulty)
-            startMatch(difficulty)
+        when (row) {
+            TitleRow.SOUND -> settings = settings.copy(soundOn = !settings.soundOn)
+            TitleRow.WHEEL -> settings = settings.copy(
+                sensitivity = if (settings.sensitivity == Sensitivity.NORMAL) Sensitivity.FAST else Sensitivity.NORMAL,
+            )
+            TitleRow.EASY, TitleRow.NORMAL, TitleRow.HARD -> {
+                val difficulty = checkNotNull(row.difficulty)
+                settings = settings.copy(difficulty = difficulty)
+                startMatch(difficulty)
+            }
         }
     }
 
@@ -168,8 +256,8 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
 
     private fun startMatch(difficulty: Difficulty) {
         val seed = newSeed()
-        log += "match seed=$seed difficulty=${difficulty.name.lowercase()}"
-        match = Match(seed, difficulty)
+        log += "match seed=$seed difficulty=${difficulty.name.lowercase()} sensitivity=${settings.sensitivity.name.lowercase()}"
+        match = Match(seed, difficulty, settings.sensitivity)
     }
 
     private class Snapshot(val match: Match?, val mode: Mode, val phase: String?, val playerScore: Int, val computerScore: Int)
@@ -201,6 +289,7 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
             }
             if (scorer != null) log += "point=${scorer.name.lowercase()} score=${after.playerScore}-${after.computerScore}"
         }
+        if (before.mode == Mode.PLAY && (after.mode != Mode.PLAY || current !== before.match)) burst.end()?.let { log += it }
         preselectMenuRow(before.mode, after.mode, reshown)
         logMode(before, after)
     }
@@ -227,10 +316,11 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
         }
     }
 
-    private companion object {
-        const val POINT = "point"
+    companion object {
+        const val BENCHMARK_NANOS = 30_000_000_000L
+        private const val POINT = "point"
 
-        fun phaseName(phase: Phase) = when (phase) {
+        private fun phaseName(phase: Phase) = when (phase) {
             is Phase.PlayerServe -> "serve=player"
             is Phase.ComputerServe -> "serve=computer"
             is Phase.Rally -> "rally"

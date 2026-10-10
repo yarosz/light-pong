@@ -17,7 +17,7 @@ class PongOwnerTest {
     fun `re-attaching shows any in-match state as Paused`() {
         val first = PongOwner.attach { Settings() }
         first.tapTitle(TitleRow.NORMAL)
-        first.command(Command.CLICK)
+        first.wheel(Command.CLICK)
         assertEquals(Mode.PLAY, first.mode)
         val again = PongOwner.attach { error("settings are loaded once per process") }
         assertSame(first, again)
@@ -31,7 +31,7 @@ class PongOwnerTest {
         val state = PongOwner.attach { Settings() }
         state.tapTitle(TitleRow.NORMAL)
         state.pause()
-        state.command(Command.DOWN)
+        state.wheel(Command.DOWN)
         assertEquals(MenuRow.MENU, state.menuRow)
         PongOwner.attach { Settings() }
         assertEquals(Mode.PAUSED, state.mode)
@@ -43,7 +43,7 @@ class PongOwnerTest {
         val state = PongOwner.attach { Settings() }
         state.tapTitle(TitleRow.NORMAL)
         state.playUntil { mode == Mode.OVER }
-        state.command(Command.DOWN)
+        state.wheel(Command.DOWN)
         PongOwner.attach { Settings() }
         assertEquals(Mode.OVER, state.mode)
         assertEquals(MenuRow.MENU, state.menuRow)

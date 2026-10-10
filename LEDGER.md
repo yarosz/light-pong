@@ -1,8 +1,9 @@
 # Ledger
 
-STATUS: 0.1.0, the first release. The design (rounds A, B and C), the pure core (S1), the Tool's
-screens (S2), both review rounds (S1b, S2b) and the docs (S3) are merged to `main`, and a release
-build was played on a Light Phone III (L1). Not yet in Light's Tool Library. `scripts/domain-drift.sh`
+STATUS: 0.1.1 in progress: the frame judder fix (D30), wheel acceleration and the Wheel row (D31),
+and their review fixes (S5b). 0.1.0, the first release, is on `main`: the design (rounds A, B and
+C), the pure core (S1), the Tool's screens (S2), both review rounds (S1b, S2b) and the docs (S3),
+with a release build played on a Light Phone III (L1). Not yet in Light's Tool Library. `scripts/domain-drift.sh`
 reports 0 unresolved.
 
 ## Handoff
@@ -23,6 +24,7 @@ the pure core are the ones reviews keep checking.
 | S2b | UI review fixes (4e11ac7) | Resume preselected on re-entry (D27), audio failure plays silent (D28), balanced panel hint (D29), tests for the three key hooks |
 | S3 | Docs for 0.1.0 (`release-0.1.0`) | `README.md`, `AGENTS.md`, `RELEASING.md`, `SECURITY.md`, `CONTRIBUTING.md`, `docs/privacy.md`, `docs/release-notes/0.1.0.md`; `docs/domain-ignore.txt` resolves the 17 UI and plumbing names; `scripts/domain-drift.sh` 0 unresolved |
 | L1 | Release build on a Light Phone III (2026-10-10) | Non-debuggable 0.1.0 installed and profile-compiled; injected `input keyevent 317/318/319` started a Match, served, moved the Paddle 40 px per Detent (317 up) and played Rallies with Player hits (`PongEvent`); frame interval P50, P90 and P99 16.6 ms over 1,079 frames (`PongPerf`, `p90.py`); thermal status 0; brightness unchanged by the wheel; Akkurat fits the Title hint on one line and breaks the panel hint in two balanced lines |
+| L2 | Frame judder fix on a Light Phone III (D30; was N11) | `mise run bench` on the phone: `steps 4:1727 3:13 of 1740 frames at the 1170 px/s cap, frame_ms P50/P90/P99/max 16.6, draw_ms P50 0.24, P90 0.5, P99 0.97`. The by-eye check of a Rally at the cap stays with the owner |
 | N5 | README screenshots | `docs/screenshots/title.png`, `rally.png` and `paused.png`, LP3 screencaps checked for personal data |
 
 ## Next
