@@ -47,11 +47,18 @@ class PongStateTest {
     }
 
     @Test
+    fun `the match line names the sound choice`() {
+        val state = newState(Settings(soundOn = false))
+        state.tapTitle(TitleRow.HARD)
+        assertTrue("match seed=42 difficulty=hard sensitivity=normal sound=off" in state.drainLog())
+    }
+
+    @Test
     fun `a match plays at the Sensitivity chosen on Title`() {
         val state = newState(Settings(sensitivity = Sensitivity.FAST))
         state.tapTitle(TitleRow.NORMAL)
         assertEquals(Sensitivity.FAST, state.match?.sensitivity)
-        assertTrue("match seed=42 difficulty=normal sensitivity=fast" in state.drainLog())
+        assertTrue("match seed=42 difficulty=normal sensitivity=fast sound=on" in state.drainLog())
         val start = state.match!!.playerTarget
         state.key(KeyPress.down(WHEEL_DOWN, 0, atMillis = 1_000))
         state.advance(STEP_NANOS)
@@ -404,14 +411,14 @@ class PongStateTest {
         state.pause()
         val log = state.drainLog()
         assertEquals("state=title", log[0])
-        assertEquals("match seed=7 difficulty=normal sensitivity=normal", log[1])
+        assertEquals("match seed=7 difficulty=normal sensitivity=normal sound=on", log[1])
         assertEquals("state=play serve=player", log[2])
         assertEquals("state=play rally", log[3])
         val points = log.filter { it.startsWith("point=") }
         assertEquals(2, points.size)
         assertTrue(points[0].endsWith("score=0-1") || points[0].endsWith("score=1-0"), points[0])
         assertTrue("state=play serve=computer" in log, log.toString())
-        assertTrue(log.all { it.matches(Regex("""state=\w+( \S+)?|match seed=\d+ difficulty=\w+ sensitivity=(normal|fast)|point=(player|computer) score=\d+-\d+|hit=paddle side=(player|computer)""")) }, log.toString())
+        assertTrue(log.all { it.matches(Regex("""state=\w+( \S+)?|match seed=\d+ difficulty=\w+ sensitivity=(normal|fast) sound=(on|off)|point=(player|computer) score=\d+-\d+|hit=paddle side=(player|computer)""")) }, log.toString())
         assertEquals("state=paused", log.last())
         assertTrue(state.drainLog().isEmpty())
     }

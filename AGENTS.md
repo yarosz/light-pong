@@ -116,13 +116,17 @@ frozen too:
   Detents a second, rounded.
 
 Each Match starts with one `PongEvent` line, `match seed=<n> difficulty=<easy|normal|hard>
-sensitivity=<normal|fast>`, so a `spin` line can be read against the curve it ran on. Its keys
-(`match seed`, `difficulty`, `sensitivity`) are frozen too.
+sensitivity=<normal|fast> sound=<on|off>`, so a `spin` line can be read against the curve it ran on
+and a benchmark against its sound choice. Its keys (`match seed`, `difficulty`, `sensitivity`,
+`sound`) are frozen too.
 
 `mise run bench <serial>` builds the `benchmark` build type (release with `BuildConfig.BENCHMARK_RALLY`:
 not debuggable, dev-signed, same applicationId), installs it over the Tool, and opens straight into an
-endless Rally at the 1170 px/s cap for 30 s, then prints P50/P90 of each key and the frames by Steps.
-Reinstall the normal build afterwards. Only the LP3's numbers mean anything; hold the phone lease.
+endless Rally at the 1170 px/s cap for 30 s, then prints P50/P90 of each key, the frames by Steps,
+`sound: on|off` (from the `match` line; the benchmark plays tones when sound is on) and
+`hitches (frame_ms > 33.4): N of M`. It exits 1 when the hitches are more than 0.5% of the frames: a
+hitch is a frame that missed at least one vsync, as each paddle hit's blocking tone did in 0.1.1
+(decision log D32). Reinstall the normal build afterwards. Only the LP3's numbers mean anything; hold the phone lease.
 
 ## How changes land
 

@@ -2,8 +2,10 @@
 # The frame benchmark on a device (decision log D30). Builds and installs the benchmark Tool (the
 # `benchmark` build type: release, R8 on, not debuggable, dev-signed, same applicationId), which opens
 # straight into an endless Rally at the 1170 px/s cap and logs PongPerf lines for 30 s. Prints P50/P90
-# of every PongPerf key (frame_ms, steps, draw_ms, speed) with scripts/p90.py, and how many frames
-# ran each number of Steps.
+# of every PongPerf key (frame_ms, steps, draw_ms, speed) with scripts/p90.py, how many frames ran
+# each number of Steps, whether sound was on (from the Match's `match` PongEvent line), and the
+# hitches: frames longer than two 60 Hz periods (frame_ms > 33.4). Exits 1 when the hitches are more
+# than 0.5% of the frames (decision log D32: a blocking tone froze one frame each paddle hit).
 #
 #   scripts/bench.sh <adb serial>        (mise run bench <serial>)
 #
@@ -63,7 +65,7 @@ echo "bench: 30 s Rally at the speed cap on $model"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 deadline=$(( $(date +%s) + ${BENCH_DEADLINE_S:-90} ))
-until a logcat -d -s PongPerf:D >"$work/lines" && grep -q 'PongPerf: done' "$work/lines"; do
+until a logcat -d -s PongPerf:D PongEvent:D >"$work/lines" && grep -q 'PongPerf: done' "$work/lines"; do
   [ "$(date +%s)" -lt "$deadline" ] || die "no 'done' line within ${BENCH_DEADLINE_S:-90} s ($(grep -c 'frame_ms=' "$work/lines" || true) lines logged)"
   sleep 2
 done
@@ -74,3 +76,8 @@ echo
 echo "PongPerf on $model ($(wc -l <"$work/measured" | tr -d ' ') lines after a warm-up line)"
 python3 "$p90" "$work/measured"
 echo "frames by steps: $(grep -o 'steps=[0-9]*' "$work/measured" | sort | uniq -c | awk '{printf "%s%s:%s", sep, substr($2, 7), $1; sep=" "}')"
+sound=$(grep -o 'match seed=.* sound=[a-z]*' "$work/lines" | tail -n 1 | sed 's/.*sound=//')
+echo "sound: ${sound:-unknown (no match line)}"
+read -r hitches frames < <(grep -o 'frame_ms=[0-9.]*' "$work/measured" | awk -F= '$2 > 33.4 {n++} END {print n + 0, NR}')
+echo "hitches (frame_ms > 33.4): $hitches of $frames"
+[ $(( hitches * 200 )) -le "$frames" ] || die "hitches are more than 0.5% of the frames"

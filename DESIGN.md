@@ -116,7 +116,7 @@ Square waves with a 2 ms linear attack and release, generated once at 44,100 Hz 
 | Wall bounce | 226 Hz | 16 ms |
 | Point | 490 Hz | 257 ms |
 
-A new tone cuts off the one playing. Sound is on by default and the mute choice persists. Pause, background and Menu stop any playing tone. Menus, selection moves and pausing make no sound. No haptics.
+A new tone cuts off the one playing. Tones never block a frame: every track call runs off the main thread, and a tone superseded before it starts is dropped (decision log D32). Sound is on by default and the mute choice persists. Pause, background and Menu stop any playing tone. Menus, selection moves and pausing make no sound. No haptics.
 
 ## Input
 
