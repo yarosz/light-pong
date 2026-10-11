@@ -40,6 +40,7 @@ class TonesTest {
         tones.play(SoundEvent.PADDLE)
         val elapsedMillis = (System.nanoTime() - started) / 1_000_000
         assertTrue(elapsedMillis < 10, "play blocked the caller for $elapsedMillis ms")
+        calls.awaitRestartEntered()
         tones.release()
         calls.awaitReleased()
         assertEquals("restart PADDLE", calls.log.first { it.startsWith("restart") })
