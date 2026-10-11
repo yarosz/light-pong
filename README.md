@@ -4,7 +4,7 @@ Pong for the Light Phone III. You play against the computer, and you move your p
 with the scroll wheel. The paddle sits on the left, beside the wheel. There is no account, no
 network and nothing to set up.
 
-> **Status: 0.1.1. Not yet in Light's Tool Library.** A Light Phone III Tool
+> **Status: 0.1.2. Not yet in Light's Tool Library.** A Light Phone III Tool
 > built on [Light's SDK](https://github.com/lightphone/light-sdk).
 
 Questions or bugs: https://github.com/yarosz/light-pong/issues

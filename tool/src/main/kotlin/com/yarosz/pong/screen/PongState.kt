@@ -256,7 +256,7 @@ class PongState(settings: Settings, private val newSeed: () -> Long) {
 
     private fun startMatch(difficulty: Difficulty) {
         val seed = newSeed()
-        log += "match seed=$seed difficulty=${difficulty.name.lowercase()} sensitivity=${settings.sensitivity.name.lowercase()}"
+        log += "match seed=$seed difficulty=${difficulty.name.lowercase()} sensitivity=${settings.sensitivity.name.lowercase()} sound=${if (settings.soundOn) "on" else "off"}"
         match = Match(seed, difficulty, settings.sensitivity)
     }
 

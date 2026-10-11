@@ -190,7 +190,8 @@ resulting spec.
   one press. Match over shown again keeps its row: the Match has already ended, so neither row loses
   anything, and the player's last choice stands, as Title's does.
 - D28 Audio failure never stops the game. If any of the three tracks fails to build, the ones built are
-  released and the Tool plays silent; a failed play or stop is logged and skipped.
+  released and the Tool plays silent; a failed play or stop is logged and skipped. The tracks'
+  `PERFORMANCE_MODE_LOW_LATENCY`, built with this fix, is superseded by D32.
 - D29 The panel hint keeps its copy and wraps with balanced lines (`LineBreak.Heading`) when it does
   not fit on one line, so no word is left alone on the second line.
 
@@ -253,3 +254,24 @@ resulting spec.
   conceding 2.38 a Match; 195/200 and 4.48 on the first curve), and at 15 a second, now 46.7 px a
   Detent, it beats Hard 26/200, where it won 1/200 in 0.1.0 (D22) and 200/200 on the first curve.
   The Difficulty table (N3) is to be tuned from the `spin` lines of real play.
+
+## Build decisions (S6, audio hitch; 2026-10-10)
+
+- D32 Tones never block a frame. Source: the owner, on 0.1.1: "a small bit of stickiness when the ball
+  touches the paddle". On the LP3, the benchmark Rally at the cap with sound on ran 35 frames of
+  100 ms in 26 s (`frame_ms` P99 and max 100, 35 frames at the 12-Step clamp), one each paddle hit,
+  while audioserver logged `Binder ... destroyed after setMinSchedulerPolicy before being parceled`
+  every 0.82 s; with sound off the same run had none (L2). Cause: `Tones.play` (pause, rewind, play
+  on a static `AudioTrack`) ran on the main thread inside the frame callback, and each call waited on
+  audioserver for about 100 ms. Fix: every track call, from building to releasing, runs on one worker
+  thread (`java.util.concurrent`), so `play` and `stop` only enqueue. Only the newest request runs:
+  one superseded before the worker reaches it is dropped, which keeps "a new tone cuts off the old"
+  (item 18) and never lets a slow track queue stale tones. Requests run in order, release runs last
+  and ends the worker, and calls after release are ignored. A pending tone is dropped by release too.
+  The tracks' performance mode is one constant, now `PERFORMANCE_MODE_NONE`: static tracks of 16 to
+  257 ms do not need the fast mixer, and its scheduler-policy handshake is the call audioserver was
+  logging. The emulator cannot settle this: it has no FastMixer, so LOW_LATENCY is silently denied
+  there, and 0.1.1's Tones ran without a hitch on it (0 of 1,740 frames). The LP3 A/B of the two
+  modes is LEDGER N12. `mise run bench` now prints `sound: on|off`, read from the Match's `match`
+  line, which gains `sound=on|off`, and `hitches (frame_ms > 33.4): N of M`, and fails when the
+  hitches are more than 0.5% of the frames.

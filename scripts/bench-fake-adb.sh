@@ -7,7 +7,7 @@
 # FAKE_ADB_STATE is a directory holding:
 #   dev/<serial>/model   getprop ro.product.model
 #   dev/<serial>/avd     `emu avd name` (emulators only)
-#   lines                what `logcat -d -s PongPerf:D` prints
+#   lines                what `logcat -d -s PongPerf:D PongEvent:D` prints
 #   nodone               if present, that logcat leaves out the "done" line
 #   log                  every call, one per line
 set -uo pipefail
@@ -29,7 +29,7 @@ case "$*" in
   "shell input keyevent KEYCODE_WAKEUP" | "shell wm dismiss-keyguard" | "logcat -c") ;;
   "shell am force-stop com.yarosz.pong") ;;
   "shell am start -W -n com.yarosz.pong/com.thelightphone.sdk.LightActivity") echo "Status: ok" ;;
-  "logcat -d -s PongPerf:D")
+  "logcat -d -s PongPerf:D PongEvent:D")
     if [ -f "$state/nodone" ]; then grep -v 'PongPerf: done' "$state/lines"; else cat "$state/lines"; fi ;;
   *) echo "fake adb: unknown call: $*" >&2; exit 97 ;;
 esac

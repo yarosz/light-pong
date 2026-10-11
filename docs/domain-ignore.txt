@@ -37,8 +37,11 @@ Settings
 SettingsFile
 
 # The audio played for Sound events (DESIGN.md item 18). CONTEXT.md's Sound event entry names a tone as
-# the audio played for an event, so Tones is the right word here.
+# the audio played for an event, so Tones is the right word here. ToneTrack is one tone's audio track
+on the Tones worker, and AudioToneTrack its AudioTrack implementation (decision log D32).
 Tones
+ToneTrack
+AudioToneTrack
 
 # UI copy. "You win" addresses the Player, as DESIGN.md's copy list does. "else" is not copy: the
 # script reads `"on" else "off"` in Settings.encode as one string.
